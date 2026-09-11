@@ -17,7 +17,7 @@ struct ControllerEnvironment {
         NSApp.modalWindow == nil && RunLoop.current.currentMode != .eventTracking
     }
     var connectionInterval: TimeInterval = 1
-    var animationInterval: TimeInterval = 1.0 / 30.0
+    var animationInterval: TimeInterval? = nil
     var clock: () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }
 
     static var production: Self {
@@ -54,6 +54,8 @@ final class ControllerModel: ObservableObject {
     @Published var keyResponseEnabled = false
     @Published var indicatorNotice = ""
     @Published var measuredFPS = 0.0
+    @Published var animationFPS = 60
+    @Published private(set) var playingFPSLimit = 60
     @Published var lastPressedKey = "—"
     @Published var mappingMode = false {
         didSet {
@@ -115,7 +117,7 @@ final class ControllerModel: ObservableObject {
                 let loadedLayers = p.studioLayers
                 try LightingLayer.validate(loadedLayers, allowedKeyIDs: Set(keys.map(\.id)))
                 layers = loadedLayers; selectedLayerID = layers.first?.id
-                brightness = p.settings.brightness; effect = p.builtInEffect
+                brightness = p.settings.brightness; effect = p.builtInEffect; animationFPS = p.frameRate ?? 60
                 restoreOnReconnect = p.restoreOnReconnect
                 wantConnection = p.restoreOnReconnect && p.resume
                 if wantConnection { status = "Waiting for the keyboard to restore your saved lighting…" }
@@ -158,7 +160,7 @@ final class ControllerModel: ObservableObject {
     }
     var hasLayerChanges: Bool {
         guard let profile, profile.mode == .studio else { return true }
-        return layers != profile.studioLayers || brightness != profile.settings.brightness
+        return layers != profile.studioLayers || brightness != profile.settings.brightness || animationFPS != (profile.frameRate ?? 60)
     }
     var hasReactiveLayers: Bool { (activeLayers ?? layers).contains { $0.enabled && $0.settings.effect.requiresKeyPresses } }
     var controlsLocked: Bool { busy || frameInFlight }
@@ -337,15 +339,16 @@ final class ControllerModel: ObservableObject {
         do {
             try LightingLayer.validate(layers, allowedKeyIDs: Set(keys.map(\.id)))
             try require((0...4).contains(brightness), "Brightness must be 0–4.")
+            try require([15, 30, 60, 90, 120].contains(animationFPS), "Choose a valid animation FPS limit.")
         } catch { status = error.localizedDescription; return }
         guard mappedCount > 0 || !layers.contains(where: { $0.enabled && ($0.settings.effect.requiresMapping || $0.keyIDs != nil) }) else {
             status = "Map at least one key before using spatial effects or selected keys."; return
         }
         stopPlayback(savePausedState: false)
         selectingLayerKeys = false
-        applyStudio(layers, brightness: brightness, save: true)
+        applyStudio(layers, brightness: brightness, frameRate: animationFPS, save: true)
     }
-    private func applyStudio(_ selected: [LightingLayer], brightness: Int, save: Bool, explicitResume: Bool = false) {
+    private func applyStudio(_ selected: [LightingLayer], brightness: Int, frameRate: Int, save: Bool, explicitResume: Bool = false) {
         guard connected && !busy, let map else { return }
         let colors = LayerRenderer.frame(layers: selected, keys: keys, mapping: map, pulses: [], time: now)
         run("Start lighting layers", operation: { c in
@@ -357,17 +360,18 @@ final class ControllerModel: ObservableObject {
             var saved = true
             if save {
                 var summary = selected.first?.settings ?? LightingSettings(); summary.brightness = brightness
-                self.profile = LightingProfile(mode: .studio, settings: summary, restoreOnReconnect: self.restoreOnReconnect, layers: selected)
+                self.profile = LightingProfile(mode: .studio, settings: summary, restoreOnReconnect: self.restoreOnReconnect, layers: selected, frameRate: frameRate)
                 saved = self.saveProfile()
             } else if explicitResume {
                 self.profile?.resume = true
                 saved = self.saveProfile()
             }
+            self.playingFPSLimit = frameRate
             self.activeLayers = selected; self.lastRendered = colors; self.pulses = []
             self.playing = brightness > 0; self.generation += 1; self.lastAudit = self.now
             if self.playing {
                 self.startLightingInputs()
-                let timer = Timer(timeInterval: self.environment.animationInterval, repeats: true) { [weak self] _ in self?.animationTick() }
+                let timer = Timer(timeInterval: self.environment.animationInterval ?? 1.0 / Double(frameRate), repeats: true) { [weak self] _ in self?.animationTick() }
                 self.frameTimer = timer; RunLoop.main.add(timer, forMode: .common)
             }
             if saved {
@@ -430,7 +434,7 @@ final class ControllerModel: ObservableObject {
                     guard token == self.generation else { return }
                     self.state = s; self.frame = displayed; self.lastRendered = colors
                     self.updateIndicatorNotice(overrides)
-                    self.measuredFPS = 1.0 / max(0.001, self.now - max(self.lastFrameFinished, started - 1.0/30.0))
+                    self.measuredFPS = 1.0 / max(0.001, self.now - max(self.lastFrameFinished, started - 1.0 / Double(self.playingFPSLimit)))
                     self.lastFrameFinished = self.now
                     if full { self.lastAudit = self.now }
                 }
@@ -448,7 +452,7 @@ final class ControllerModel: ObservableObject {
     func restoreProfile(explicitResume: Bool = false) {
         guard !mappingMode else { status = "Leave key mapping before restoring a lighting effect."; return }
         guard let p = profile else { return }
-        if p.mode == .studio { applyStudio(p.studioLayers, brightness: p.settings.brightness, save: false, explicitResume: explicitResume); return }
+        if p.mode == .studio { applyStudio(p.studioLayers, brightness: p.settings.brightness, frameRate: p.frameRate ?? 60, save: false, explicitResume: explicitResume); return }
         run("Restore saved lighting", operation: { c in
             if p.mode == .builtIn { try c.brightness(p.settings.brightness); try c.effect(p.builtInEffect) }
             else if let frame = p.colors {

@@ -38,7 +38,7 @@ struct ControllerView: View {
                 header
                 HStack {
                     Label(model.playing ? "LIVE • \(model.playingEffectName)" : model.state.map { $0.effect == 19 ? "Direct RGB" : "Built-in effect \($0.effect)" } ?? "Awaiting connection", systemImage: "keyboard")
-                    if model.playing && model.measuredFPS > 0 { Text(String(format: "%.0f fps", model.measuredFPS)).monospacedDigit() }
+                    if model.playing && model.measuredFPS > 0 { Text(String(format: "%.0f fps actual · %d cap", model.measuredFPS, model.playingFPSLimit)).monospacedDigit() }
                     Spacer()
                     Text("\(model.mappedCount) / 104 keys mapped").foregroundStyle(.secondary)
                     if !model.mappingMode {
@@ -96,6 +96,14 @@ struct ControllerView: View {
                 layerStack.frame(width: 255)
                 Divider()
                 layerEditor.frame(maxWidth: .infinity, alignment: .leading)
+            }.disabled(model.busy)
+            HStack {
+                Picker("Animation FPS cap", selection: $model.animationFPS) {
+                    ForEach([15, 30, 60, 90, 120], id: \.self) { rate in Text("\(rate) FPS").tag(rate) }
+                }.frame(width: 240)
+                Text("Shared by all layers. Actual FPS depends on USB response speed.")
+                    .font(.caption).foregroundStyle(.secondary)
+                Spacer()
             }.disabled(model.busy)
             HStack(spacing: 16) {
                 Picker("Keyboard brightness", selection: $model.brightness) {

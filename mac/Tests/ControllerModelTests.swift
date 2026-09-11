@@ -174,6 +174,7 @@ private final class MockLightingInputs: LightingInputSource {
 }
 @main private struct ControllerModelTests {
     static func main() throws {
+        try frameRatePersists()
         try liveInputLifecycle()
         try noProfileIsReadOnly()
         try reconnectRestoresAfterGate()
@@ -194,6 +195,25 @@ private final class MockLightingInputs: LightingInputSource {
         try wasdTriggersWholeKeyboard()
         try wasdTriggersWholeKeyboard(effect: .rainbowRipple)
         print("All controller lifecycle tests passed using mock USB and isolated profiles.")
+    }
+    private static func frameRatePersists() throws {
+        let h = try Harness("frame-rate")
+        try h.connect(8200)
+        h.model.animationFPS = 90
+        try h.start(.ripple)
+        try expect(h.model.playingFPSLimit == 90 && (try h.saved()).frameRate == 90, "Applied FPS must save")
+        h.model.animationFPS = 15
+        try expect(h.model.hasLayerChanges && h.model.playingFPSLimit == 90, "Draft FPS cannot silently change running playback")
+        h.bus.remove(); try awaitState("FPS disconnect") { !h.model.connected }
+        h.bus.attach(8201); try awaitState("FPS restored") { h.model.connected && h.model.playing }
+        try expect(h.model.playingFPSLimit == 90 && h.model.animationFPS == 15, "Reconnect restores saved FPS and preserves unapplied draft")
+        h.model.startStudio(); try awaitState("new FPS applied") { !h.model.busy && h.model.playingFPSLimit == 15 }
+        let saved = try h.saved(); try expect(saved.frameRate == 15, "Updated frame rate must save")
+        try h.shutdown()
+        let restored = try Harness("frame-rate-relaunch", initialProfile: saved)
+        try expect(restored.model.animationFPS == 15, "Relaunch must restore selected FPS")
+        try restored.shutdown()
+        print("PASS: FPS cap persists, restores across reconnect/relaunch and stays isolated from unapplied edits")
     }
     private static func liveInputLifecycle() throws {
         let inputs = MockLightingInputs()

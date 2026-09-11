@@ -34,6 +34,10 @@ Combine up to 16 layers, with independent effect, speed, intensity, opacity, ble
 
 **Affect all keys** controls where each layer renders. For example, select WASD as a Rainbow ripple layer's triggers and turn on Affect all keys: only WASD starts ripples, but their light travels across all 104 mapped keys. Turning it off confines the light to WASD. An empty key selection disables the layer's output.
 
+### Animation frame rate
+
+Choose **Animation FPS cap** (15, 30, 60, 90 or 120), then **Apply & save layers**. The default is 60. The live header shows achieved FPS alongside the applied cap. The cap is shared by the layer stack because the keyboard receives one combined frame. It changes frame pacing without changing the ripple's travel speed or duration. USB speed and readback verification may keep actual FPS below the selected cap. No USB safety checks are removed to chase a higher rate.
+
 Version 1.4 keeps ripple rings visible until they pass the farthest mapped key. Rainbow color cycling wraps independently of travel distance, so reaching the last hue cannot end the ripple. Speed controls travel time.
 
 ### Adaptive music
@@ -47,6 +51,10 @@ The app uses a private [Core Audio process tap](https://developer.apple.com/docu
 Add a CPU temperature layer and apply it. The live label reports Celsius and the number of readable sensors. Set the blue and red endpoints independently for that layer (defaults: 40°C and 90°C). Green is halfway between them. These are lighting preferences, not hardware safety limits.
 
 Temperature comes from read-only AppleSMC CPU sensor values, not CPU utilization or macOS thermal-pressure estimates. Unavailable, invalid or stale readings leave the layer transparent and show an unavailable message. AppleSMC is an undocumented interface; sensor availability can change between Macs and macOS versions. Verified on an Apple M5 running macOS 27. No fan speeds, voltages or power settings are changed. See [technical references](../THIRD_PARTY_NOTICES.md).
+
+## Bluetooth and 2.4 GHz
+
+Lighting Studio's RGB control and the firmware installer's flashing path support **wired USB only**. The app does not implement Bluetooth or receiver RGB control. Normal Bluetooth/2.4 GHz keyboard operation with this custom firmware has not been verified; do not assume wireless compatibility from the wired tests. Use a cable for updates.
 
 ## Mapping and reconnection
 
@@ -85,6 +93,6 @@ Firmware v0.2 can force status-light slots 14, 33, 57 and 91 to white. Only thos
 
 The public release includes automated verification and native Mac checks. Physical LED labeling, RF modes, long-term firmware stability and USB-dead recovery remain device-specific checks. The Mac installer has been validated offline and by live read-only inspection; a real Mac flash has not been performed because the connected keyboard already has the target firmware.
 
-## Release 1.4.0 verification
+## Release verification
 
-Built and tested on September 11, 2026. Live system-audio playback moved the activity meter and the keyboard framebuffer; silence returned the meter to zero. The temperature layer read 18 CPU sensors on Apple M5 and streamed its measured color. Input Monitoring showed an active keyboard listener. Both original layers and the saved LED map were preserved. The firmware installer passed its offline golden-stream checks and live read-only v0.2 inspection. No firmware was flashed from the Mac.
+September 11, 2026: local automated suites passed. Live system-audio playback moved the activity meter and keyboard framebuffer; silence returned the meter to zero. The temperature layer read 18 CPU sensors on Apple M5 and streamed its measured color. Input Monitoring showed an active keyboard listener. Original layers and the saved LED map were preserved. The firmware installer passed offline golden-stream checks and live read-only v0.2 inspection. No firmware was flashed from the Mac. Version 1.4.1 adds saved FPS limits with reconnect/relaunch and unapplied-edit isolation tests.
