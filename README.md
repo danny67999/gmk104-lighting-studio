@@ -1,20 +1,24 @@
 # GMK104 Lighting Studio for macOS
 
-A native RGB lighting app for the wired ZUOYA GMK104, with layered effects, system-audio response, CPU temperature colors, and a companion firmware installer.
+A native RGB lighting app for the ZUOYA GMK104, with layered effects, system-audio response, CPU temperature colors, USB and 2.4 GHz control, and a companion firmware installer. Bluetooth lighting and adjustable wireless sleep are experimental additions requiring firmware v0.3.
 
 **[Download the Mac apps](https://github.com/danny67999/gmk104-lighting-studio/releases/latest)**
+
+[Wireless beta 1.5](https://github.com/danny67999/gmk104-lighting-studio/releases/tag/v1.5.0-beta.1) contains the updated controller app. The experimental v0.3 firmware is local only and is not included in the public download. The latest stable release remains available above.
 
 Apple Silicon • macOS 13+ • Adaptive music requires macOS 14.2+
 
 ## Install
 
 1. Download the release disk image and drag **GMK104 RGB Controller** and **GMK104 Firmware Installer** into Applications.
-2. Open the controller and connect one GMK104 over wired USB.
+2. Open the controller and connect one GMK104 over wired USB, or plug in its dongle and select 2.4 GHz mode.
 3. The controller requires custom firmware v0.2. If it reports stock firmware, quit the controller and open the firmware installer. Inspect the keyboard before choosing an update.
 4. Enable **Input Monitoring** for GMK104 RGB Controller in System Settings → Privacy & Security, then click **Enable key response**. The button turns green only after the keyboard listener starts.
 5. Add effects with **Add layer**, then click **Apply & save layers**.
 
 These community builds are ad-hoc signed and are not Apple-notarized. On a first download, macOS may require **System Settings → Privacy & Security → Open Anyway**. Only open a download you trust. The app needs neither a driver installation nor an administrator helper.
+
+If key response stops after an update, check the Input Monitoring status inside the app. macOS can retain an entry for an earlier ad-hoc build. Remove that entry and add the current app from Applications, relaunch it, then enable key response. The button turns green only after the selected keyboard's listener opens successfully.
 
 ## Effects and layers
 
@@ -54,7 +58,15 @@ Temperature comes from read-only AppleSMC CPU sensor values, not CPU utilization
 
 ## Bluetooth and 2.4 GHz
 
-Lighting Studio's RGB control and the firmware installer's flashing path support **wired USB only**. The app does not implement Bluetooth or receiver RGB control. Normal Bluetooth/2.4 GHz keyboard operation with this custom firmware has not been verified; do not assume wireless compatibility from the wired tests. Use a cable for updates.
+**2.4 GHz:** plug in the GMK104 receiver (`320F:5088`) and select 2.4 GHz mode. The exact `FF60:0061` interface forwards the existing v0.2 RGB protocol. A complete 104-LED frame was written and read back through this receiver. Key response still requires Input Monitoring for the installed app. The listener observes only keyboard interfaces belonging to that receiver's USB attachment. A wired GMK104 takes priority when its cable is connected.
+
+When the keyboard sleeps, the receiver remains plugged in but stops answering RGB queries. The app pauses, keeps the saved profile and checks for a reply every five seconds. Press a physical key to wake the keyboard. Manual Disconnect stops automatic retries.
+
+**Bluetooth (experimental app support):** v0.2 has no Bluetooth RGB service. The controller now includes a separate encrypted GATT transport, paired PnP identity checks, acknowledged writes, RGB readback and exact keyboard input selection for a proposed v0.3 firmware service. The v0.3 firmware is local only and is not included in this public beta. Bluetooth lighting has not been tested on hardware and remains unavailable with public v0.2 firmware. The existing public installer cannot install v0.3.
+
+**Wireless sleep after:** choose 1, 2, 5, 10, 15, 30 or 60 minutes, or Never, then Apply sleep time. This changes the firmware's idle threshold for Bluetooth and 2.4 GHz and verifies it by reading it back. Controls remain locked on v0.2. The setting is saved separately on this Mac and reapplied after reconnect; powering off the keyboard resets its local setting to the five-minute default until the app reconnects. Never may use more battery. It does not disable low-battery protection or the Mac's own sleep settings.
+
+**All firmware updates require wired USB.** The installer excludes the receiver and Bluetooth from its flashing path.
 
 ## Mapping and reconnection
 
@@ -66,7 +78,7 @@ Mappings and lighting profiles are saved locally in `~/Library/Application Suppo
 
 ## Firmware installer
 
-The companion installer packages the exact custom v0.2 image built and flashed on Windows, plus the approved stock rollback image. It opens with offline hash and packet checks, then offers read-only **Inspect keyboard**. Already-installed firmware requires no update. A real update requires a readiness checkbox and the exact displayed confirmation phrase.
+The public companion installer packages the exact custom v0.2 image built and flashed on Windows, plus the stock rollback image. It opens with offline hash and packet checks, then offers read-only **Inspect keyboard**. Already-installed firmware requires no update. A real update requires a readiness checkbox and the exact displayed confirmation phrase.
 
 Use a stable wired USB connection and Mac power. Custom firmware is experimental. Keep the app open and the cable connected during upload and reboot. Stock rollback works only while the keyboard's OTA and RGB interfaces still respond; it is not a USB-dead recovery bootloader. See [the firmware guide](mac/Firmware/README.md) for approved transitions, checks and verification limits.
 
@@ -87,12 +99,12 @@ The tests use mock USB and isolated profiles. They cover exact firmware identity
 
 ## USB verification
 
-Only the exact wired `320F:5055`, RGB usage `FF60:0061`, custom v0.2 signature and current USB attachment are accepted by the controller. Each lighting start verifies all 104 LEDs, the checksum and stable readback. Animation sends complete frames through one serialized writer, validates samples and checksums, and performs periodic complete audits. Obsolete frames are dropped rather than queued.
+USB RGB control accepts wired `320F:5055` or receiver `320F:5088`, exact RGB usage `FF60:0061`, the custom v0.2-compatible signature and the current attachment. Bluetooth uses a separate identity and service gate. Each lighting start verifies all 104 LEDs, the checksum and stable readback. Animation sends complete frames through one serialized writer, validates samples and checksums, and performs periodic complete audits. Obsolete frames are dropped rather than queued.
 
 Firmware v0.2 can force status-light slots 14, 33, 57 and 91 to white. Only those exact white overrides are accepted; other mismatches stop playback. Transport or attachment failures close the connection. A color-verification failure retains the connection only if that same keyboard and firmware still verify.
 
 The public release includes automated verification and native Mac checks. Physical LED labeling, RF modes, long-term firmware stability and USB-dead recovery remain device-specific checks. The Mac installer has been validated offline and by live read-only inspection; a real Mac flash has not been performed because the connected keyboard already has the target firmware.
 
-## Release verification
+## Beta verification
 
-September 11, 2026: local automated suites passed. Live system-audio playback moved the activity meter and keyboard framebuffer; silence returned the meter to zero. The temperature layer read 18 CPU sensors on Apple M5 and streamed its measured color. Input Monitoring showed an active keyboard listener. Original layers and the saved LED map were preserved. The firmware installer passed offline golden-stream checks and live read-only v0.2 inspection. No firmware was flashed from the Mac. Version 1.4.1 adds saved FPS limits with reconnect/relaunch and unapplied-edit isolation tests.
+Controller 1.5.0 passed local automated tests, native compilation and bundle verification. A complete 104-LED RGB frame was written and read back through the 2.4 GHz receiver, then the original built-in effect was restored. Bluetooth discovery confirmed that v0.2 has no RGB service. Bluetooth and sleep UI/protocol tests pass, but those features need firmware that is not part of this public beta and have not been tested physically. Physical 2.4 GHz key-response confirmation is pending Input Monitoring authorization for the updated build.

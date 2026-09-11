@@ -8,6 +8,7 @@ private final class MockBus {
         var brightness = 3
         var colors = Array(repeating: RGB.black, count: 104)
         var validFirmware = true
+        var sleepSeconds = 300
     }
     struct Event {
         let id: UInt64
@@ -24,6 +25,10 @@ private final class MockBus {
     private var held = false
     private var time: TimeInterval = 1000
     private var firmwareColors: [Int: RGB] = [:]
+    var wireless = false
+    var adjustableSleep = false
+    private var awake = true
+    func setAwake(_ value: Bool) { locked { awake = value } }
 
     private func locked<T>(_ action: () throws -> T) rethrows -> T {
         lock.lock(); defer { lock.unlock() }
@@ -67,10 +72,12 @@ private final class MockBus {
         }
         return try locked {
             guard var d = device, d.id == id else { throw ControllerError.message("Mock keyboard disconnected") }
+            guard awake else { throw TransportUnavailableError(message: "Receiver has no wireless response") }
             if p[0] == 7 {
                 events.append(Event(id: id, kind: "write", payload: p))
                 if p[2] == 1 { d.brightness = Int(p[3]) }
                 if p[2] == 2 { d.effect = Int(p[3]) }
+                if p[2] == 6 && adjustableSleep { d.sleepSeconds = Int(p[4]) | Int(p[5]) << 8 }
                 if p[2] == 5 {
                     if d.effect != 19 || p[4] == 0 { d.colors = Array(repeating: .black, count: 104) }
                     d.effect = 19
@@ -83,6 +90,10 @@ private final class MockBus {
                 return p + Array(repeating: 0, count: 32-p.count)
             }
             events.append(Event(id: id, kind: "read", payload: p))
+            if p[2] == 6 {
+                guard adjustableSleep else { return p + Array(repeating: 0, count: 32-p.count) }
+                return KeyboardSleepState.signature + [UInt8(d.sleepSeconds&255),UInt8(d.sleepSeconds>>8),3,3,16,14,60,0] + Array(repeating:0,count:16)
+            }
             let index = Int(p[3]), c = d.colors[index], sum = RGBClient.sum(d.colors)
             var response = RGBClient.signature + [UInt8(index), c.r, c.g, c.b, UInt8(d.effect), UInt8(d.brightness), UInt8(sum & 255), UInt8(sum >> 8)]
             response += Array(repeating: 0, count: 32-response.count)
@@ -96,6 +107,8 @@ private final class MockSession: ReportTransport {
     private let bus: MockBus
     private let id: UInt64
     private var closed = false // All calls are serialized by ControllerModel's HID queue.
+    var connectionName: String { bus.wireless ? "2.4 GHz" : "USB" }
+    var reconnectsWithoutReplug: Bool { bus.wireless }
     init(bus: MockBus, id: UInt64) { self.bus = bus; self.id = id }
     func checkSingleDevice() throws { try require(!closed, "Mock session closed"); try bus.check(id) }
     func exchange(_ payload: [UInt8]) throws -> [UInt8] { try require(!closed, "Mock session closed"); return try bus.exchange(payload, id: id) }
@@ -174,7 +187,9 @@ private final class MockLightingInputs: LightingInputSource {
 }
 @main private struct ControllerModelTests {
     static func main() throws {
+        try wirelessSleepSettings()
         try frameRatePersists()
+        try receiverRecoversWithoutReplug()
         try liveInputLifecycle()
         try noProfileIsReadOnly()
         try reconnectRestoresAfterGate()
@@ -195,6 +210,47 @@ private final class MockLightingInputs: LightingInputSource {
         try wasdTriggersWholeKeyboard()
         try wasdTriggersWholeKeyboard(effect: .rainbowRipple)
         print("All controller lifecycle tests passed using mock USB and isolated profiles.")
+    }
+    private static func wirelessSleepSettings() throws {
+        let old = try Harness("sleep-legacy")
+        try old.connect(1701)
+        try expect(!old.model.sleepSupported && old.bus.writes(1701).isEmpty, "v0.2 must remain connected with sleep controls locked")
+        old.model.sleepAfterSeconds = 0; old.model.applySleepTime(); pump(0.03)
+        try expect(old.bus.writes(1701).isEmpty, "Unsupported sleep settings must never write")
+        try old.shutdown()
+        let h = try Harness("sleep-settings")
+        h.bus.wireless = true; h.bus.adjustableSleep = true
+        try h.connect(1702)
+        try expect(h.model.sleepSupported && h.model.appliedSleepSeconds == 300 && h.bus.writes(1702).isEmpty, "Connecting reads the actual sleep time without changing it")
+        h.model.sleepAfterSeconds = 0; h.model.applySleepTime()
+        try awaitState("verified Never setting") { !h.model.busy && h.model.appliedSleepSeconds == 0 }
+        let settings = h.profileURL.deletingLastPathComponent().appendingPathComponent("keyboard-settings.json")
+        try expect(try KeyboardPreferences.load(from: settings)?.sleepSeconds == 0, "Save Never only after readback verifies")
+        try expect(!FileManager.default.fileExists(atPath: h.profileURL.path), "Sleep settings must not create or replace a lighting profile")
+        h.model.disconnect(); try awaitState("sleep disconnect") { !h.model.busy }
+        try h.connect(1703)
+        try expect(h.model.appliedSleepSeconds == 0 && h.bus.writes(1703).count == 1 && h.bus.writes(1703)[0].payload[2] == 6,
+                   "Reconnection restores only the saved sleep control before any lighting restore")
+        try h.shutdown()
+        print("PASS: v0.2 sleep controls remain locked; verified Never persists independently and restores after reconnect")
+    }
+    private static func receiverRecoversWithoutReplug() throws {
+        let h = try Harness("receiver-sleep")
+        h.bus.wireless = true
+        try h.connect(5088); try h.start(.wave)
+        try expect(h.model.connectionName == "2.4 GHz", "Receiver connection must be named accurately")
+        h.bus.setAwake(false); h.bus.advance(0.1)
+        try awaitState("radio timeout") { !h.model.connected && !h.model.busy }
+        let opens = h.bus.recorded(5088).filter { $0.kind == "open" }.count
+        pump(0.08)
+        try expect(h.bus.recorded(5088).filter { $0.kind == "open" }.count == opens, "Wireless retries must back off")
+        h.bus.setAwake(true); h.bus.advance(6)
+        try awaitState("same receiver recovery") { h.model.connected && h.model.playing && !h.model.busy }
+        try expect(h.bus.snapshot().registryID == 5088, "Recovery must work without replacing the receiver attachment")
+        try h.shutdown()
+        h.bus.advance(6); pump(0.08)
+        try expect(!h.model.connected, "Manual Disconnect must suppress wireless retries")
+        print("PASS: receiver timeout backs off, resumes the saved effect on the same dongle, and honors manual Disconnect")
     }
     private static func frameRatePersists() throws {
         let h = try Harness("frame-rate")

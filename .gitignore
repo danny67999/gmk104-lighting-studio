@@ -2,3 +2,5 @@
 mac/.build/
 outputs/
 *.log
+**/__pycache__/
+*.pyc

@@ -21,22 +21,19 @@ struct ControllerEnvironment {
     var clock: () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }
 
     static var production: Self {
-        Self(layoutURL: Bundle.main.url(forResource: "layout", withExtension: "json"),
+        let connections = KeyboardConnections()
+        return Self(layoutURL: Bundle.main.url(forResource: "layout", withExtension: "json"),
              defaultMappingURL: Bundle.main.url(forResource: "default-led-map", withExtension: "json"),
              mappingURL: MappingFile.saveURL, profileURL: LightingProfile.url,
-             openTransport: {
-                 let transport = try HIDTransport()
-                 return (transport, transport.registryEntryID)
-             }, attachments: {
-                 let matches = HIDTransport.candidates()
-                 return (matches.count, matches.count == 1 ? try? HIDTransport.registryID(of: matches[0]) : nil)
-             }, makeLightingInputs: { NativeLightingInputSource() })
+             openTransport: { try connections.open() }, attachments: { connections.attachments() },
+             makeLightingInputs: { NativeLightingInputSource() })
     }
 }
 
 final class ControllerModel: ObservableObject {
-    @Published var status = "Connect your GMK104 by USB to read its firmware and lighting state."
+    @Published var status = "Connect your GMK104 by USB, 2.4 GHz or Bluetooth to read its firmware and lighting state."
     @Published var connected = false
+    @Published private(set) var connectionName = "USB"
     @Published var busy = false
     @Published var state: RGBState?
     @Published var frame: [RGB]?
@@ -55,6 +52,12 @@ final class ControllerModel: ObservableObject {
     @Published var indicatorNotice = ""
     @Published var measuredFPS = 0.0
     @Published var animationFPS = 60
+    @Published var sleepAfterSeconds = 300
+    @Published private(set) var appliedSleepSeconds: Int?
+    @Published private(set) var sleepSupported = false
+    @Published private(set) var sleepStatus = "Connect the keyboard to check its sleep setting."
+    private var keyboardPreferences: KeyboardPreferences?
+    private var keyboardPreferencesURL: URL { environment.profileURL.deletingLastPathComponent().appendingPathComponent("keyboard-settings.json") }
     @Published private(set) var playingFPSLimit = 60
     @Published var lastPressedKey = "—"
     @Published var mappingMode = false {
@@ -94,6 +97,7 @@ final class ControllerModel: ObservableObject {
     private var generation = 0
     private var attachedID: UInt64?
     private var blockedID: UInt64?
+    private var nextConnectionAttempt = TimeInterval.infinity
     private var lastRendered: [RGB]?
     private var lastAudit = 0.0
     private var lastFrameFinished = 0.0
@@ -123,6 +127,10 @@ final class ControllerModel: ObservableObject {
                 if wantConnection { status = "Waiting for the keyboard to restore your saved lighting…" }
             }
         } catch { status = "Saved configuration could not be loaded: \(error.localizedDescription)" }
+        do {
+            keyboardPreferences = try KeyboardPreferences.load(from: keyboardPreferencesURL)
+            if let keyboardPreferences { sleepAfterSeconds = keyboardPreferences.sleepSeconds }
+        } catch { sleepStatus = error.localizedDescription }
         canUndoMappingReset = FileManager.default.fileExists(atPath: mappingBackupURL.path)
         let timer = Timer(timeInterval: environment.connectionInterval, repeats: true) { [weak self] _ in self?.pollConnection() }
         connectionTimer = timer; RunLoop.main.add(timer, forMode: .common)
@@ -201,21 +209,34 @@ final class ControllerModel: ObservableObject {
     func connect(automatic: Bool = false) {
         guard !busy && !connected else { return }
         wantConnection = true
-        if !automatic { blockedID = nil }
+        if !automatic { blockedID = nil; nextConnectionAttempt = .infinity }
         busy = true; status = "Reading custom firmware signature…"
+        let savedSleepTime = keyboardPreferences?.sleepSeconds
         queue.async {
             self.client?.transport.close(); self.client = nil; self.clientAttachmentID = nil
             do {
                 let opened = try self.environment.openTransport()
                 let c = RGBClient(opened.transport); self.client = c; self.clientAttachmentID = opened.registryID
                 let s = try c.read()
+                var sleep = try c.readSleepSettings()
+                if let savedSleepTime, sleep != nil, sleep?.seconds != savedSleepTime {
+                    try c.setSleepTime(savedSleepTime); sleep = try c.readSleepSettings()
+                }
                 if s.effect == 19 { _ = try c.readFrame() }
                 let colors = s.effect == 19 ? c.shadow : nil
                 let id = opened.registryID
+                let connectionName = opened.transport.connectionName
+                let sleepState = sleep
                 DispatchQueue.main.async {
                     self.connected = true; self.busy = false; self.state = s; self.frame = colors; self.attachedID = id
+                    self.connectionName = connectionName; self.blockedID = nil; self.nextConnectionAttempt = .infinity
                     self.brightness = s.brightness; self.effect = min(18, s.effect)
-                    self.status = "Connected • Custom firmware v0.2 verified"
+                    self.status = "\(connectionName) connected • Custom firmware \(sleepState == nil ? "v0.2" : "v0.3") verified"
+                    self.sleepSupported = sleepState != nil; self.appliedSleepSeconds = sleepState?.seconds
+                    if let sleepState {
+                        self.sleepAfterSeconds = sleepState.seconds
+                        self.sleepStatus = "Keyboard sleep: \(KeyboardPreferences.label(sleepState.seconds)). Saved changes are reapplied by this Mac after reconnect."
+                    } else { self.sleepStatus = "Changing wireless sleep time requires firmware v0.3." }
                     self.startKeyboardInput()
                     if self.restoreOnReconnect && self.profile?.resume == true && !self.mappingMode { self.restoreProfile() }
                 }
@@ -233,21 +254,24 @@ final class ControllerModel: ObservableObject {
                     self.stopPlayback(savePausedState: false)
                     self.connected = true; self.attachedID = id; self.busy = false
                     self.state = current; self.frame = nil; self.resetMappingSelection()
-                    self.status = "\(error.localizedDescription) USB is still connected. Try the lighting action again."
+                    self.status = "\(error.localizedDescription) \(self.connectionName) is still connected. Try the lighting action again."
                 }
                 return
             } catch { /* Identity or transport also failed: close below. */ }
         }
-        let failedID = clientAttachmentID
+        let failedID = clientAttachmentID ?? environment.attachments().registryID
+        let retryWirelessly = error is TransportUnavailableError && (client?.transport.reconnectsWithoutReplug ?? true)
         client?.transport.close(); client = nil; clientAttachmentID = nil
         DispatchQueue.main.async {
             self.blockedID = failedID ?? self.attachedID
+            self.nextConnectionAttempt = retryWirelessly ? self.now + 5 : .infinity
             self.stopPlayback(savePausedState: false)
             self.keyboardEvents?.stop(); self.keyboardEvents = nil
             self.keyResponseEnabled = false
             self.connected = false; self.busy = false; self.state = nil; self.frame = nil
+            self.sleepSupported = false; self.appliedSleepSeconds = nil
             self.attachedID = nil; self.resetMappingSelection()
-            self.status = "\(error.localizedDescription) Waiting for USB reconnection; click Connect to retry."
+            self.status = "\(error.localizedDescription) \(retryWirelessly ? "Saved lighting will resume automatically when the keyboard answers." : "Click Connect to retry.")"
             self.inputStatus = "Keyboard disconnected"
         }
     }
@@ -256,6 +280,7 @@ final class ControllerModel: ObservableObject {
         keyboardEvents?.stop(); keyboardEvents = nil
         keyResponseEnabled = false
         busy = true; connected = false; attachedID = nil
+        sleepSupported = false; appliedSleepSeconds = nil
         queue.async {
             self.client?.transport.close(); self.client = nil; self.clientAttachmentID = nil
             DispatchQueue.main.async {
@@ -278,11 +303,12 @@ final class ControllerModel: ObservableObject {
                         self.keyboardEvents?.stop(); self.keyboardEvents = nil
                         self.keyResponseEnabled = false
                         self.connected = false; self.attachedID = nil; self.state = nil; self.frame = nil
+                        self.sleepSupported = false; self.appliedSleepSeconds = nil
                         self.resetMappingSelection()
                         self.queue.async { self.client?.transport.close(); self.client = nil; self.clientAttachmentID = nil }
                         self.status = snapshot.count > 1 ? "Connect exactly one GMK104 keyboard." : "Keyboard unplugged. Your lighting profile will resume after reconnection."
                     }
-                } else if let id, id != self.blockedID { self.connect(automatic: true) }
+                } else if let id, id != self.blockedID || self.now >= self.nextConnectionAttempt { self.connect(automatic: true) }
                 else if id == nil { self.blockedID = nil }
             }
         }
@@ -307,6 +333,19 @@ final class ControllerModel: ObservableObject {
         if KeyboardEvents.permission != .granted {
             inputStatus = "Allow GMK104 RGB Controller in System Settings → Privacy & Security → Input Monitoring, then click Enable key response again."
         }
+    }
+    func applySleepTime() {
+        guard connected, sleepSupported, !busy else { return }
+        let seconds = sleepAfterSeconds
+        run("Apply wireless sleep time", operation: { try $0.setSleepTime(seconds) }, success: {
+            self.appliedSleepSeconds = seconds
+            do {
+                let preferences = KeyboardPreferences(sleepSeconds: seconds)
+                try preferences.save(to: self.keyboardPreferencesURL)
+                self.keyboardPreferences = preferences
+                self.sleepStatus = "Verified on keyboard: \(KeyboardPreferences.label(seconds)). Saved on this Mac and reapplied after reconnect."
+            } catch { self.sleepStatus = "Sleep time changed on the keyboard, but could not be saved: \(error.localizedDescription)" }
+        })
     }
     func keyPressed(_ key: String) {
         guard connected else { return }
