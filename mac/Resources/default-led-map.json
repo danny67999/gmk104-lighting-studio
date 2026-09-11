@@ -1,0 +1,527 @@
+{
+  "schemaVersion": 1,
+  "layoutId": "ansi-104",
+  "ledCount": 104,
+  "mappings": [
+    {
+      "keyId": "Escape",
+      "ledIndex": 0,
+      "confirmed": true
+    },
+    {
+      "keyId": "F1",
+      "ledIndex": 1,
+      "confirmed": true
+    },
+    {
+      "keyId": "F2",
+      "ledIndex": 2,
+      "confirmed": true
+    },
+    {
+      "keyId": "F3",
+      "ledIndex": 3,
+      "confirmed": true
+    },
+    {
+      "keyId": "F4",
+      "ledIndex": 4,
+      "confirmed": true
+    },
+    {
+      "keyId": "F5",
+      "ledIndex": 5,
+      "confirmed": true
+    },
+    {
+      "keyId": "F6",
+      "ledIndex": 6,
+      "confirmed": true
+    },
+    {
+      "keyId": "F7",
+      "ledIndex": 7,
+      "confirmed": true
+    },
+    {
+      "keyId": "F8",
+      "ledIndex": 8,
+      "confirmed": true
+    },
+    {
+      "keyId": "F9",
+      "ledIndex": 9,
+      "confirmed": true
+    },
+    {
+      "keyId": "F10",
+      "ledIndex": 10,
+      "confirmed": true
+    },
+    {
+      "keyId": "F11",
+      "ledIndex": 11,
+      "confirmed": true
+    },
+    {
+      "keyId": "F12",
+      "ledIndex": 12,
+      "confirmed": true
+    },
+    {
+      "keyId": "PrintScreen",
+      "ledIndex": 13,
+      "confirmed": true
+    },
+    {
+      "keyId": "ScrollLock",
+      "ledIndex": 14,
+      "confirmed": true
+    },
+    {
+      "keyId": "Pause",
+      "ledIndex": 15,
+      "confirmed": true
+    },
+    {
+      "keyId": "Backquote",
+      "ledIndex": 16,
+      "confirmed": true
+    },
+    {
+      "keyId": "Digit1",
+      "ledIndex": 17,
+      "confirmed": true
+    },
+    {
+      "keyId": "Digit2",
+      "ledIndex": 18,
+      "confirmed": true
+    },
+    {
+      "keyId": "Digit3",
+      "ledIndex": 19,
+      "confirmed": true
+    },
+    {
+      "keyId": "Digit4",
+      "ledIndex": 20,
+      "confirmed": true
+    },
+    {
+      "keyId": "Digit5",
+      "ledIndex": 21,
+      "confirmed": true
+    },
+    {
+      "keyId": "Digit6",
+      "ledIndex": 22,
+      "confirmed": true
+    },
+    {
+      "keyId": "Digit7",
+      "ledIndex": 23,
+      "confirmed": true
+    },
+    {
+      "keyId": "Digit8",
+      "ledIndex": 24,
+      "confirmed": true
+    },
+    {
+      "keyId": "Digit9",
+      "ledIndex": 25,
+      "confirmed": true
+    },
+    {
+      "keyId": "Digit0",
+      "ledIndex": 26,
+      "confirmed": true
+    },
+    {
+      "keyId": "Minus",
+      "ledIndex": 27,
+      "confirmed": true
+    },
+    {
+      "keyId": "Equal",
+      "ledIndex": 28,
+      "confirmed": true
+    },
+    {
+      "keyId": "Backspace",
+      "ledIndex": 29,
+      "confirmed": true
+    },
+    {
+      "keyId": "Insert",
+      "ledIndex": 30,
+      "confirmed": true
+    },
+    {
+      "keyId": "Home",
+      "ledIndex": 31,
+      "confirmed": true
+    },
+    {
+      "keyId": "PageUp",
+      "ledIndex": 32,
+      "confirmed": true
+    },
+    {
+      "keyId": "NumLock",
+      "ledIndex": 33,
+      "confirmed": true
+    },
+    {
+      "keyId": "NumpadDivide",
+      "ledIndex": 34,
+      "confirmed": true
+    },
+    {
+      "keyId": "NumpadMultiply",
+      "ledIndex": 35,
+      "confirmed": true
+    },
+    {
+      "keyId": "NumpadSubtract",
+      "ledIndex": 36,
+      "confirmed": true
+    },
+    {
+      "keyId": "Tab",
+      "ledIndex": 37,
+      "confirmed": true
+    },
+    {
+      "keyId": "KeyQ",
+      "ledIndex": 38,
+      "confirmed": true
+    },
+    {
+      "keyId": "KeyW",
+      "ledIndex": 39,
+      "confirmed": true
+    },
+    {
+      "keyId": "KeyE",
+      "ledIndex": 40,
+      "confirmed": true
+    },
+    {
+      "keyId": "KeyR",
+      "ledIndex": 41,
+      "confirmed": true
+    },
+    {
+      "keyId": "KeyT",
+      "ledIndex": 42,
+      "confirmed": true
+    },
+    {
+      "keyId": "KeyY",
+      "ledIndex": 43,
+      "confirmed": true
+    },
+    {
+      "keyId": "KeyU",
+      "ledIndex": 44,
+      "confirmed": true
+    },
+    {
+      "keyId": "KeyI",
+      "ledIndex": 45,
+      "confirmed": true
+    },
+    {
+      "keyId": "KeyO",
+      "ledIndex": 46,
+      "confirmed": true
+    },
+    {
+      "keyId": "KeyP",
+      "ledIndex": 47,
+      "confirmed": true
+    },
+    {
+      "keyId": "BracketLeft",
+      "ledIndex": 48,
+      "confirmed": true
+    },
+    {
+      "keyId": "BracketRight",
+      "ledIndex": 49,
+      "confirmed": true
+    },
+    {
+      "keyId": "Backslash",
+      "ledIndex": 50,
+      "confirmed": true
+    },
+    {
+      "keyId": "Delete",
+      "ledIndex": 51,
+      "confirmed": true
+    },
+    {
+      "keyId": "End",
+      "ledIndex": 52,
+      "confirmed": true
+    },
+    {
+      "keyId": "PageDown",
+      "ledIndex": 53,
+      "confirmed": true
+    },
+    {
+      "keyId": "Numpad7",
+      "ledIndex": 54,
+      "confirmed": true
+    },
+    {
+      "keyId": "Numpad8",
+      "ledIndex": 55,
+      "confirmed": true
+    },
+    {
+      "keyId": "Numpad9",
+      "ledIndex": 56,
+      "confirmed": true
+    },
+    {
+      "keyId": "CapsLock",
+      "ledIndex": 57,
+      "confirmed": true
+    },
+    {
+      "keyId": "KeyA",
+      "ledIndex": 58,
+      "confirmed": true
+    },
+    {
+      "keyId": "KeyS",
+      "ledIndex": 59,
+      "confirmed": true
+    },
+    {
+      "keyId": "KeyD",
+      "ledIndex": 60,
+      "confirmed": true
+    },
+    {
+      "keyId": "KeyF",
+      "ledIndex": 61,
+      "confirmed": true
+    },
+    {
+      "keyId": "KeyG",
+      "ledIndex": 62,
+      "confirmed": true
+    },
+    {
+      "keyId": "KeyH",
+      "ledIndex": 63,
+      "confirmed": true
+    },
+    {
+      "keyId": "KeyJ",
+      "ledIndex": 64,
+      "confirmed": true
+    },
+    {
+      "keyId": "KeyK",
+      "ledIndex": 65,
+      "confirmed": true
+    },
+    {
+      "keyId": "KeyL",
+      "ledIndex": 66,
+      "confirmed": true
+    },
+    {
+      "keyId": "Semicolon",
+      "ledIndex": 67,
+      "confirmed": true
+    },
+    {
+      "keyId": "Quote",
+      "ledIndex": 68,
+      "confirmed": true
+    },
+    {
+      "keyId": "Enter",
+      "ledIndex": 69,
+      "confirmed": true
+    },
+    {
+      "keyId": "Numpad4",
+      "ledIndex": 70,
+      "confirmed": true
+    },
+    {
+      "keyId": "Numpad5",
+      "ledIndex": 71,
+      "confirmed": true
+    },
+    {
+      "keyId": "Numpad6",
+      "ledIndex": 72,
+      "confirmed": true
+    },
+    {
+      "keyId": "NumpadAdd",
+      "ledIndex": 73,
+      "confirmed": true
+    },
+    {
+      "keyId": "ShiftLeft",
+      "ledIndex": 74,
+      "confirmed": true
+    },
+    {
+      "keyId": "KeyZ",
+      "ledIndex": 75,
+      "confirmed": true
+    },
+    {
+      "keyId": "KeyX",
+      "ledIndex": 76,
+      "confirmed": true
+    },
+    {
+      "keyId": "KeyC",
+      "ledIndex": 77,
+      "confirmed": true
+    },
+    {
+      "keyId": "KeyV",
+      "ledIndex": 78,
+      "confirmed": true
+    },
+    {
+      "keyId": "KeyB",
+      "ledIndex": 79,
+      "confirmed": true
+    },
+    {
+      "keyId": "KeyN",
+      "ledIndex": 80,
+      "confirmed": true
+    },
+    {
+      "keyId": "KeyM",
+      "ledIndex": 81,
+      "confirmed": true
+    },
+    {
+      "keyId": "Comma",
+      "ledIndex": 82,
+      "confirmed": true
+    },
+    {
+      "keyId": "Period",
+      "ledIndex": 83,
+      "confirmed": true
+    },
+    {
+      "keyId": "Slash",
+      "ledIndex": 84,
+      "confirmed": true
+    },
+    {
+      "keyId": "ShiftRight",
+      "ledIndex": 85,
+      "confirmed": true
+    },
+    {
+      "keyId": "ArrowUp",
+      "ledIndex": 86,
+      "confirmed": true
+    },
+    {
+      "keyId": "Numpad1",
+      "ledIndex": 87,
+      "confirmed": true
+    },
+    {
+      "keyId": "Numpad2",
+      "ledIndex": 88,
+      "confirmed": true
+    },
+    {
+      "keyId": "Numpad3",
+      "ledIndex": 89,
+      "confirmed": true
+    },
+    {
+      "keyId": "ControlLeft",
+      "ledIndex": 90,
+      "confirmed": true
+    },
+    {
+      "keyId": "MetaLeft",
+      "ledIndex": 91,
+      "confirmed": true
+    },
+    {
+      "keyId": "AltLeft",
+      "ledIndex": 92,
+      "confirmed": true
+    },
+    {
+      "keyId": "Space",
+      "ledIndex": 93,
+      "confirmed": true
+    },
+    {
+      "keyId": "AltRight",
+      "ledIndex": 94,
+      "confirmed": true
+    },
+    {
+      "keyId": "MetaRight",
+      "ledIndex": 95,
+      "confirmed": true
+    },
+    {
+      "keyId": "ContextMenu",
+      "ledIndex": 96,
+      "confirmed": true
+    },
+    {
+      "keyId": "ControlRight",
+      "ledIndex": 97,
+      "confirmed": true
+    },
+    {
+      "keyId": "ArrowLeft",
+      "ledIndex": 98,
+      "confirmed": true
+    },
+    {
+      "keyId": "ArrowDown",
+      "ledIndex": 99,
+      "confirmed": true
+    },
+    {
+      "keyId": "ArrowRight",
+      "ledIndex": 100,
+      "confirmed": true
+    },
+    {
+      "keyId": "Numpad0",
+      "ledIndex": 101,
+      "confirmed": true
+    },
+    {
+      "keyId": "NumpadDecimal",
+      "ledIndex": 102,
+      "confirmed": true
+    },
+    {
+      "keyId": "NumpadEnter",
+      "ledIndex": 103,
+      "confirmed": true
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+name: macOS checks
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  test-and-build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test renderers, persistence, USB and firmware plans
+        run: ./mac/test.sh
+      - name: Build both apps
+        run: |
+          ./mac/build.sh
+          ./mac/Firmware/build.sh
+      - name: Verify signed bundles
+        run: |
+          codesign --verify --deep --strict 'outputs/GMK104 RGB Controller.app'
+          codesign --verify --deep --strict 'outputs/GMK104 Firmware Installer.app'

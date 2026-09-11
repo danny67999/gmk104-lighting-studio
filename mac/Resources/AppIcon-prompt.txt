@@ -1,0 +1,13 @@
+Generation mode: Built-in image_gen tool (no CLI fallback).
+Production preparation: Native sips downsampling to 1024 square, alpha preserved. Native iconutil packaging using the standard 16, 32, 128, 256, and 512 point icon sizes at 1x and 2x.
+
+Final prompt:
+Use case: logo-brand
+Asset type: finished macOS application icon, 1024 by 1024 pixels, square PNG with actual alpha transparency outside the rounded tile.
+Primary request: Create a polished, distinctive app icon for a mechanical keyboard RGB lighting controller called GMK104 Lighting Studio, with NO lettering anywhere.
+Scene/backdrop: A single dark charcoal rounded-square macOS app tile centered on a transparent canvas, generous standard macOS icon margins, subtle beveled edge and restrained soft shadow.
+Subject: A bold, simplified mechanical keyboard silhouette in slightly elevated top-down perspective, with just three clear rows of chunky keycaps and one wider spacebar. The central key glows luminous green. Two elegant, open circular pulse arcs travel outward from that key across and behind the keyboard, graduating green to cyan. The pulse motif must remain immediately legible at small Dock size.
+Style/medium: Premium crisp 3D app icon with clean geometric forms, smooth graphite surfaces, realistic restrained edge highlights, no fussy texture.
+Composition/framing: Large centered keyboard occupying most of the tile; confident simple silhouette; arcs frame it with breathing room, everything fully inside the rounded square.
+Color palette: charcoal black and graphite, vivid electric green and a small cyan accent.
+Constraints: one icon only, genuine transparent exterior alpha, no text, no letters, no numerals, no brand logos, no watermark, no UI screenshot, no surrounding objects, no excessive tiny key detail, no rainbow clutter.
