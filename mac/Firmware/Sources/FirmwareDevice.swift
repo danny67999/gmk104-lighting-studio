@@ -152,7 +152,7 @@ enum FirmwareInstaller {
         defer { session.close() }
         let query: [UInt8] = [5, 1] + [UInt8](repeating: 0, count: 62)
         let crc = try FirmwarePlan.version(session.exchange(query, timeout: 3), session.exchange(query, timeout: 3))
-        let transport = try HIDTransport()
+        let transport = try HIDTransport(wiredOnly: true)
         defer { transport.close() }
         try require(transport.registryEntryID == pair.viaID, "RGB interface changed during inspection.")
         let via = try transport.exchange([1])

@@ -77,7 +77,7 @@ struct ControllerView: View {
             }
             Spacer()
             Circle().fill(model.connected ? Color.green : Color.gray).frame(width: 8, height: 8)
-            Text(model.connected ? "USB connected" : "Offline").foregroundStyle(.secondary)
+            Text(model.connected ? "\(model.connectionName) connected" : "Offline").foregroundStyle(.secondary)
             if model.busy { ProgressView().controlSize(.small) }
             Button(model.connected ? "Disconnect" : "Connect") { model.connected ? model.disconnect() : model.connect() }
                 .disabled(model.busy)
@@ -101,7 +101,7 @@ struct ControllerView: View {
                 Picker("Animation FPS cap", selection: $model.animationFPS) {
                     ForEach([15, 30, 60, 90, 120], id: \.self) { rate in Text("\(rate) FPS").tag(rate) }
                 }.frame(width: 240)
-                Text("Shared by all layers. Actual FPS depends on USB response speed.")
+                Text("Shared by all layers. Actual FPS depends on the keyboard connection.")
                     .font(.caption).foregroundStyle(.secondary)
                 Spacer()
             }.disabled(model.busy)
@@ -124,6 +124,22 @@ struct ControllerView: View {
                 Spacer()
                 keyResponseButton
             }
+            Divider()
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Picker("Wireless sleep after", selection: $model.sleepAfterSeconds) {
+                        ForEach(KeyboardPreferences.choices, id: \.self) { seconds in
+                            Text(KeyboardPreferences.label(seconds)).tag(seconds)
+                        }
+                    }.frame(width: 270)
+                    Button("Apply sleep time") { model.applySleepTime() }
+                        .disabled(!model.connected || !model.sleepSupported || model.controlsLocked)
+                    Spacer()
+                }
+                Text(model.sleepStatus).font(.caption).foregroundStyle(.secondary)
+                Text("Applies to Bluetooth and 2.4 GHz. The keyboard returns to 5 minutes after power-off until this app reapplies your saved time.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }.disabled(model.busy)
             Divider()
             HStack {
                 Toggle("Restore saved lighting after reconnect", isOn: $model.restoreOnReconnect)

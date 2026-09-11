@@ -8,6 +8,18 @@ struct RGB: Equatable, Codable {
 struct RGBState: Equatable {
     let index: Int; let color: RGB; let effect: Int; let brightness: Int; let checksum: UInt16
 }
+struct KeyboardSleepState: Equatable {
+    let seconds: Int // zero means Never
+    static let signature: [UInt8] = [8, 3, 6, 1, 71, 77, 75, 83]
+    static func parse(_ p: [UInt8]) throws -> Self? {
+        try require(p.count == 32, "Invalid sleep-setting response length.")
+        guard Array(p.prefix(8)) == signature else { return nil }
+        try require(Array(p[10..<16]) == [3,3,16,14,60,0], "Unrecognized keyboard sleep capabilities.")
+        let seconds = Int(p[8]) | Int(p[9]) << 8
+        try require(seconds == 0 || (60...3600).contains(seconds), "The keyboard returned an invalid sleep time.")
+        return Self(seconds: seconds)
+    }
+}
 enum ControllerError: LocalizedError {
     case message(String)
     var errorDescription: String? { if case .message(let message) = self { return message }; return nil }
@@ -23,9 +35,19 @@ func require(_ condition: Bool, _ message: String) throws {
     if !condition { throw ControllerError.message(message) }
 }
 protocol ReportTransport: AnyObject {
+    var connectionName: String { get }
+    var reconnectsWithoutReplug: Bool { get }
     func exchange(_ payload: [UInt8]) throws -> [UInt8]
     func checkSingleDevice() throws
     func close()
+}
+extension ReportTransport {
+    var connectionName: String { "USB" }
+    var reconnectsWithoutReplug: Bool { false }
+}
+struct TransportUnavailableError: LocalizedError {
+    let message: String
+    var errorDescription: String? { message }
 }
 final class RGBClient {
     let transport: ReportTransport
@@ -54,6 +76,16 @@ final class RGBClient {
     func read(_ index: Int = 0) throws -> RGBState {
         try require((0..<104).contains(index), "LED index must be 0–103.")
         return try Self.parse(transport.exchange([8, 3, 5, UInt8(index)]), index: index)
+    }
+    func readSleepSettings() throws -> KeyboardSleepState? {
+        try KeyboardSleepState.parse(transport.exchange([8,3,6,1]))
+    }
+    func setSleepTime(_ seconds: Int) throws {
+        try require(seconds == 0 || (60...3600).contains(seconds), "Sleep time must be 1–60 minutes or Never.")
+        _ = try gate()
+        try require(try readSleepSettings() != nil, "Adjustable sleep requires custom firmware v0.3.")
+        _ = try transport.exchange([7,3,6,1,UInt8(seconds & 255),UInt8(seconds >> 8)])
+        try require(try readSleepSettings()?.seconds == seconds, "The keyboard did not accept the sleep time.")
     }
     func readFrame(expected: [RGB]? = nil) throws -> [RGB] {
         shadow = nil
