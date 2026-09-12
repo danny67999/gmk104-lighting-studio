@@ -2,3 +2,6 @@
 mac/.build/
 outputs/
 *.log
+windows/tests/*.exe
+windows/tests/*.dll
+work/

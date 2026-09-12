@@ -1,6 +1,24 @@
-# GMK104 Lighting Studio for macOS
+# GMK104 Lighting Studio — Per-key RGB for Windows and macOS
 
-A native RGB lighting app for the wired ZUOYA GMK104, with layered effects, system-audio response, CPU temperature colors, and a companion firmware installer.
+**Unlock per-key RGB control on the ZUOYA GMK104 with compatible custom firmware.** Set a different color for each individual key, highlight WASD or other key groups, and combine layered ripple, reactive, music-responsive and other RGB effects. This is individual-key lighting control, not just a whole-keyboard color preset.
+
+The Windows port includes USB, 2.4 GHz and Bluetooth lighting transports, an installer with keyboard icons, and a separate guarded firmware flasher EXE. The macOS app and its existing source are retained below.
+
+**[Download Windows installer and firmware flasher](https://github.com/danny67999/gmk104-lighting-studio/releases/tag/windows-v1.5.2.1)** · **[Windows guide](windows/README.md)**
+
+### Windows quick start
+
+1. Download and run **GMK104-Lighting-Studio-Windows-Setup-1.5.2.1.exe**. It installs both apps for the current user, with Start-menu icons and an optional desktop shortcut.
+2. Open **GMK104 Lighting Studio**, connect the keyboard and choose a color. Use **Manual lighting → Set all keys** once to establish a complete direct-RGB frame, then click any individual key to give it its own color.
+3. Use up to 16 layers for effects and key groups; choose **Apply & save layers**. Mac lighting profiles and the full 104-key map are supported.
+
+Windows requires Windows 10/11 x64, .NET Framework 4.8 and compatible custom GMK104 firmware. Bluetooth lighting was verified through read-only identity/state checks on the connected keyboard. Actual LED behavior and sustained streaming still require a user hardware check; USB/receiver support in this Windows port has not had live transport testing. A working Bluetooth custom interface does **not** need reflashing simply to use Windows.
+
+**Firmware flashing remains wired-USB-only and experimental.** The standalone **GMK104 Firmware Flasher.exe** includes all four approved images and preserves the guarded engine's identity, checksum and confirmation checks. It does nothing to hardware on launch. Windows v0.3/v0.4 uploads remain untested; stock rollback is not a recovery mechanism for a USB-dead keyboard. These community Windows builds are unsigned. See [Windows verification limits](windows/VERIFICATION.md).
+
+## macOS app
+
+A native RGB lighting app for the wired ZUOYA GMK104, with layered effects, system-audio response, CPU temperature colors, and a companion firmware installer. The remaining instructions describe the macOS source currently in this repository; Windows behavior is documented separately above.
 
 **[Download the Mac apps](https://github.com/danny67999/gmk104-lighting-studio/releases/latest)**
 
@@ -52,7 +70,7 @@ Add a CPU temperature layer and apply it. The live label reports Celsius and the
 
 Temperature comes from read-only AppleSMC CPU sensor values, not CPU utilization or macOS thermal-pressure estimates. Unavailable, invalid or stale readings leave the layer transparent and show an unavailable message. AppleSMC is an undocumented interface; sensor availability can change between Macs and macOS versions. Verified on an Apple M5 running macOS 27. No fan speeds, voltages or power settings are changed. See [technical references](THIRD_PARTY_NOTICES.md).
 
-## Bluetooth and 2.4 GHz
+## macOS Bluetooth and 2.4 GHz
 
 Lighting Studio's RGB control and the firmware installer's flashing path support **wired USB only**. The app does not implement Bluetooth or receiver RGB control. Normal Bluetooth/2.4 GHz keyboard operation with this custom firmware has not been verified; do not assume wireless compatibility from the wired tests. Use a cable for updates.
 
