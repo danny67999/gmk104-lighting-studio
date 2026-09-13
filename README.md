@@ -4,15 +4,17 @@
 
 The Windows port includes USB, 2.4 GHz and Bluetooth lighting transports, an installer with keyboard icons, and a separate guarded firmware flasher EXE. The macOS app and its existing source are retained below.
 
-**[Download Windows installer and firmware flasher](https://github.com/danny67999/gmk104-lighting-studio/releases/tag/windows-v1.5.2.1)** · **[Windows guide](windows/README.md)**
+**[Download Windows installer and firmware flasher](https://github.com/danny67999/gmk104-lighting-studio/releases/tag/windows-v1.5.2.2)** · **[Windows guide](windows/README.md)**
+
+**Windows 1.5.2.2 fixes the USB freeze at "Connecting and checking the keyboard."** Exit the old app and run the updated installer over your existing installation. Your profiles are preserved; no uninstall or firmware reflash is needed.
 
 ### Windows quick start
 
-1. Download and run **GMK104-Lighting-Studio-Windows-Setup-1.5.2.1.exe**. It installs both apps for the current user, with Start-menu icons and an optional desktop shortcut.
+1. Download and run **GMK104-Lighting-Studio-Windows-Setup-1.5.2.2.exe**. It installs both apps for the current user, with Start-menu icons and an optional desktop shortcut.
 2. Open **GMK104 Lighting Studio**, connect the keyboard and choose a color. Use **Manual lighting → Set all keys** once to establish a complete direct-RGB frame, then click any individual key to give it its own color.
 3. Use up to 16 layers for effects and key groups; choose **Apply & save layers**. Mac lighting profiles and the full 104-key map are supported.
 
-Windows requires Windows 10/11 x64, .NET Framework 4.8 and compatible custom GMK104 firmware. Bluetooth lighting was verified through read-only identity/state checks on the connected keyboard. Actual LED behavior and sustained streaming still require a user hardware check; USB/receiver support in this Windows port has not had live transport testing. A working Bluetooth custom interface does **not** need reflashing simply to use Windows.
+Windows requires Windows 10/11 x64, .NET Framework 4.8 and compatible custom GMK104 firmware. Bluetooth and USB passed live read-only identity/state checks on the connected keyboard. The USB fix passed three fresh connections (122–146 ms) and a separate probe of the packaged application. All 2,279 offline assertions passed. Actual LED behavior and sustained streaming still require a user hardware check; receiver hardware remains untested. A working Bluetooth custom interface does **not** need reflashing simply to use Windows.
 
 **Firmware flashing remains wired-USB-only and experimental.** The standalone **GMK104 Firmware Flasher.exe** includes all four approved images and preserves the guarded engine's identity, checksum and confirmation checks. It does nothing to hardware on launch. Windows v0.3/v0.4 uploads remain untested; stock rollback is not a recovery mechanism for a USB-dead keyboard. These community Windows builds are unsigned. See [Windows verification limits](windows/VERIFICATION.md).
 

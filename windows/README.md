@@ -7,7 +7,9 @@ For Windows 10/11 x64 with .NET Framework 4.8. No Python, Node, or administrator
 
 ## Start
 
-Recommended: run **GMK104-Lighting-Studio-Windows-Setup-1.5.2.1.exe**. The per-user installer includes keyboard icons, a Start-menu entry for each app, an optional desktop shortcut, and an uninstaller. It preserves your saved lighting profiles. Opening or installing the apps never flashes firmware. The installer does not launch either app automatically.
+Recommended: run **GMK104-Lighting-Studio-Windows-Setup-1.5.2.2.exe**. The per-user installer includes keyboard icons, a Start-menu entry for each app, an optional desktop shortcut, and an uninstaller. It preserves your saved lighting profiles. Opening or installing the apps never flashes firmware. The installer does not launch either app automatically.
+
+Version 1.5.2.2 fixes the USB connection hang at "Connecting and checking the keyboard" by disabling HID report stream buffering. The same fix covers the shared 2.4 GHz transport. Exit the previous app completely, then install over the existing installation; no uninstall or firmware reflash is required. The bundled firmware and guarded flasher are unchanged.
 
 **GMK104 Firmware Flasher.exe** is also a standalone download. It embeds the existing guarded PowerShell engine and all four approved images; Windows PowerShell 5.1 must be available. It opens with no device operation, offers offline validation, and requires both a readiness check and the exact phrase before flashing. The original PowerShell confirmation remains in the results console. Keep that console open during an operation. Session files and any durable logs remain under `%LOCALAPPDATA%\GMK104FirmwareLauncher\sessions`.
 
@@ -60,4 +62,4 @@ Source is in the accompanying Windows source archive. Run `powershell -NoProfile
 
 For a read-only connection diagnostic, run the executable with `--probe` followed by an output text-file path. For an offline UI render (no device connection), use `--preview` followed by a PNG path and optional tab index 0, 1 or 2.
 
-Build the installer with `windows\Installer\build-installer.ps1 -InnoCompiler 'C:\path\to\ISCC.exe'` after installing [Inno Setup 6](https://jrsoftware.org/isdl.php). Icons are original code-drawn artwork; their reproducible source is `Installer/IconBuilder.cs`. Packaging version 1.5.2.1 adds installation and icons to the Windows port. These development EXEs are unsigned, not publisher-verified builds.
+Build the installer with `windows\Installer\build-installer.ps1 -InnoCompiler 'C:\path\to\ISCC.exe'` after installing [Inno Setup 6](https://jrsoftware.org/isdl.php). Icons are original code-drawn artwork; their reproducible source is `Installer/IconBuilder.cs`. Packaging version 1.5.2.1 added installation and icons; 1.5.2.2 fixes HID connection buffering. These development EXEs are unsigned, not publisher-verified builds.

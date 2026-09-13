@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 
@@ -14,10 +15,11 @@ namespace Gmk104LightingStudio
         {
             try
             {
-                if (args.Contains("--probe"))
+                if (args.Contains("--probe") || args.Contains("--probe-usb"))
                 {
                     // A probe exchanges GET commands only; no lighting setting is sent.
-                    using (RGBClient client = new RGBClient(KeyboardConnections.Open("Bluetooth")))
+                    string transport = args.Contains("--probe-usb") ? "USB" : "Bluetooth";
+                    using (RGBClient client = new RGBClient(KeyboardConnections.Open(transport)))
                     {
                         Console.WriteLine("Connection: " + client.Transport.ConnectionName);
                         Console.WriteLine("Identity: " + client.Transport.DeviceIdentity);
@@ -26,8 +28,10 @@ namespace Gmk104LightingStudio
                         client.Transport.CheckSingleDevice(); RGBState s = client.Read();
                         Console.WriteLine("Verified custom signature. Effect=" + s.Effect + " brightness=" + s.Brightness + " checksum=" + s.Checksum.ToString("X4") + " LED0=" + s.Color.r + "," + s.Color.g + "," + s.Color.b);
                         Console.WriteLine("Sleep seconds: " + Convert.ToString(client.ReadSleepSeconds()));
+                        if (transport == "USB" && s.Effect == 19) Console.WriteLine("Full-frame GET verified: " + client.ReadFrame().Length + " LEDs");
+                        else if (transport == "USB") Console.WriteLine("Stable direct-frame scan skipped: a built-in effect is active; no lighting mode was changed.");
                     }
-                    Console.WriteLine("READ-ONLY BLUETOOTH PROBE PASS"); return 0;
+                    Console.WriteLine("READ-ONLY " + transport.ToUpperInvariant() + " PROBE PASS"); return 0;
                 }
                 if (args.Contains("--discover"))
                 {
@@ -35,6 +39,7 @@ namespace Gmk104LightingStudio
                     foreach (Native.Device d in Native.Interfaces(BluetoothTransport.ServiceInterface)) Console.WriteLine("SERVICE " + d.Name + " node=" + d.Node + " " + d.Path);
                     return 0;
                 }
+                CheckReportStream();
                 Check(Marshal.SizeOf(typeof(Native.GattUuid)) == 20, "native UUID size");
                 Check(Marshal.SizeOf(typeof(Native.GattCharacteristic)) == 36, "native characteristic size");
                 Check(Marshal.OffsetOf(typeof(Native.GattCharacteristic), "Readable").ToInt32() == 29, "BOOLEAN native field offsets");
@@ -73,6 +78,35 @@ namespace Gmk104LightingStudio
                 Console.WriteLine("TRANSPORT / PROTOCOL TESTS PASS (" + assertions + " assertions)"); return 0;
             }
             catch (Exception ex) { Console.Error.WriteLine(ex.ToString()); return 1; }
+        }
+        private static void CheckReportStream()
+        {
+            // Exercise the production stream factory without opening a keyboard.
+            // A completed report write must reach the handle without Flush, and
+            // reading one report must not prefetch bytes from the next response.
+            string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "hid-stream-" + Guid.NewGuid().ToString("N") + ".tmp");
+            try
+            {
+                File.WriteAllBytes(path, new byte[66]);
+                using (var handle = Native.Open(path, true, true))
+                using (FileStream stream = HidTransport.OpenReportStream(handle))
+                using (FileStream observer = new FileStream(path, FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite, 1))
+                {
+                    byte[] report = Enumerable.Repeat((byte)0x5A, 33).ToArray();
+                    var write = stream.WriteAsync(report, 0, report.Length);
+                    Check(write.Wait(2000), "report write completes within deadline");
+                    byte[] actual = new byte[33];
+                    Check(observer.Read(actual, 0, actual.Length) == 33 && actual.SequenceEqual(report), "completed HID-sized write is not buffered");
+                    stream.Position = 0;
+                    var read = stream.ReadAsync(actual, 0, actual.Length);
+                    Check(read.Wait(2000) && read.Result == 33 && actual.SequenceEqual(report), "one complete report read");
+                    observer.Position = 33;
+                    observer.Write(report, 0, report.Length);
+                    read = stream.ReadAsync(actual, 0, actual.Length);
+                    Check(read.Wait(2000) && read.Result == 33 && actual.SequenceEqual(report), "report read does not prefetch the next response");
+                }
+            }
+            finally { if (File.Exists(path)) File.Delete(path); }
         }
         private sealed class Fake : IReportTransport
         {

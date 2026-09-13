@@ -1,0 +1,3 @@
+c2b32466b73fca679d43e55ce9e824e0770ea80678caa6d8f7e4dee100a78c93  GMK104-Lighting-Studio-Windows-Setup-1.5.2.2.exe
+00384d63434bfb8efcc605d0c2b161af4f8f53e64f4cc94c6b86571f16289794  GMK104-Windows-Portable-1.5.2.2.zip
+32dfd5e94694d2defc8ce2d50e818105f772a1e6b4da6dfd2df2366cc211ff78  GMK104-Windows-Source-1.5.2.2.zip

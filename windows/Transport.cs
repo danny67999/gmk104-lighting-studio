@@ -133,8 +133,17 @@ namespace Gmk104LightingStudio
             if (candidate.Input != 33 || candidate.Output != 33) throw new TransportUnavailableException("GMK104 must expose 33-byte Windows HID reports.");
             handle = Native.Open(selected.Device.Path, true, true);
             if (handle.IsInvalid) { handle.Dispose(); throw new TransportUnavailableException("Could not open GMK104. Close other lighting applications and reconnect.", new Win32Exception(Marshal.GetLastWin32Error())); }
-            try { stream = new FileStream(handle, FileAccess.ReadWrite, 64, true); }
+            try { stream = OpenReportStream(handle); }
             catch { handle.Dispose(); throw; }
+        }
+        internal static FileStream OpenReportStream(SafeFileHandle reportHandle)
+        {
+            // Framework FileStream may synchronously fill its buffer inside
+            // ReadAsync when the report is smaller than that buffer. That waits
+            // for a reply before Exchange can send the request or check its
+            // deadline. A one-byte buffer bypasses buffering for 33-byte HID
+            // reports in both directions (USB and the 2.4 GHz receiver).
+            return new FileStream(reportHandle, FileAccess.ReadWrite, 1, true);
         }
         private void Available() { if (closed) throw new TransportUnavailableException("This keyboard connection is closed. Connect again."); }
         public void CheckSingleDevice()

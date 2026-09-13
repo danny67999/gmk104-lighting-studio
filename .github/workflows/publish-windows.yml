@@ -3,13 +3,13 @@ on:
   push:
     branches: [main]
     paths:
-      - 'release-assets/windows-1.5.2.1/**'
+      - 'release-assets/windows-1.5.2.2/**'
       - '.github/workflows/publish-windows.yml'
   workflow_dispatch:
 permissions:
   contents: write
 concurrency:
-  group: windows-release-1.5.2.1
+  group: windows-release-1.5.2.2
   cancel-in-progress: false
 jobs:
   publish:
@@ -17,29 +17,28 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Verify locally tested artifacts
-        working-directory: release-assets/windows-1.5.2.1
+        working-directory: release-assets/windows-1.5.2.2
         run: sha256sum --check SHA256SUMS.txt
-      - name: Publish installer, guarded flasher, portable app and source
+      - name: Publish USB fix installer, portable app and source
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         shell: bash
         run: |
           set -euo pipefail
-          tag=windows-v1.5.2.1
-          cd release-assets/windows-1.5.2.1
+          tag=windows-v1.5.2.2
+          cd release-assets/windows-1.5.2.2
           if gh release view "$tag" >/dev/null 2>&1; then
             echo 'Release already exists; refusing to replace its files automatically.'
             exit 1
           fi
           gh release create "$tag" \
             --target "$GITHUB_SHA" --draft --prerelease \
-            --title 'GMK104 per-key RGB — Windows installer and firmware flasher 1.5.2.1' \
+            --title 'GMK104 per-key RGB — Windows 1.5.2.2 USB connection fix' \
             --notes-file RELEASE-NOTES.md \
-            GMK104-Lighting-Studio-Windows-Setup-1.5.2.1.exe \
-            GMK104-Firmware-Flasher-1.5.2.1.exe \
-            GMK104-Windows-Portable-1.5.2.1.zip \
-            GMK104-Windows-Source-1.5.2.1.zip SHA256SUMS.txt
+            GMK104-Lighting-Studio-Windows-Setup-1.5.2.2.exe \
+            GMK104-Windows-Portable-1.5.2.2.zip \
+            GMK104-Windows-Source-1.5.2.2.zip SHA256SUMS.txt
           mkdir verified-downloads
           gh release download "$tag" --dir verified-downloads
           (cd verified-downloads && sha256sum --check SHA256SUMS.txt)

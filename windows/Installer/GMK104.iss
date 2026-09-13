@@ -4,7 +4,7 @@
 #ifndef ArtifactDir
   #error ArtifactDir is required
 #endif
-#define ProductVersion "1.5.2.1"
+#define ProductVersion "1.5.2.2"
 [Setup]
 #ifdef SmokeTest
 AppId={{8057B21A-7C40-4F0F-A56D-14BFCA2CC104}
@@ -25,7 +25,7 @@ WizardStyle=modern
 SetupIconFile={#PayloadDir}\gmk104.ico
 UninstallDisplayIcon={app}\GMK104 Lighting Studio.exe
 OutputDir={#ArtifactDir}
-OutputBaseFilename=GMK104-Lighting-Studio-Windows-Setup-1.5.2.1
+OutputBaseFilename=GMK104-Lighting-Studio-Windows-Setup-{#ProductVersion}
 Compression=lzma2
 SolidCompression=yes
 DisableProgramGroupPage=yes

@@ -3,7 +3,7 @@ $ErrorActionPreference='Stop'
 $windowsRoot=Split-Path -Parent $PSScriptRoot
 $projectRoot=Split-Path -Parent $windowsRoot
 $csc='C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe'
-$artifacts=Join-Path $projectRoot 'outputs\windows-installer-1.5.2.1'
+$artifacts=Join-Path $projectRoot 'outputs\windows-installer-1.5.2.2'
 $payload=Join-Path $artifacts 'portable'
 $icons=Join-Path $windowsRoot 'Resources'
 New-Item -ItemType Directory -Path $artifacts,$payload -Force | Out-Null
