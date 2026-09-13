@@ -10,6 +10,8 @@ The Windows port includes USB, 2.4 GHz and Bluetooth lighting transports, an ins
 
 ### Windows quick start
 
+**[Documentation hub](docs/README.md)** — [installation](docs/getting-started.md), [individual-key colors and layers](docs/per-key-rgb.md), [troubleshooting](docs/troubleshooting.md), [firmware safety](docs/firmware-safety.md), and [developer guide](docs/development.md).
+
 1. Download and run **GMK104-Lighting-Studio-Windows-Setup-1.5.2.2.exe**. It installs both apps for the current user, with Start-menu icons and an optional desktop shortcut.
 2. Open **GMK104 Lighting Studio**, connect the keyboard and choose a color. Use **Manual lighting → Set all keys** once to establish a complete direct-RGB frame, then click any individual key to give it its own color.
 3. Use up to 16 layers for effects and key groups; choose **Apply & save layers**. Mac lighting profiles and the full 104-key map are supported.

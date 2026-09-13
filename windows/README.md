@@ -5,6 +5,8 @@
 Windows port of the transferred GMK104 Mac Lighting Studio 1.5.2-beta.1 project.
 For Windows 10/11 x64 with .NET Framework 4.8. No Python, Node, or administrator rights are needed for the lighting app.
 
+See the [documentation hub](../docs/README.md) for step-by-step installation, individual-key RGB examples, troubleshooting and firmware safety.
+
 ## Start
 
 Recommended: run **GMK104-Lighting-Studio-Windows-Setup-1.5.2.2.exe**. The per-user installer includes keyboard icons, a Start-menu entry for each app, an optional desktop shortcut, and an uninstaller. It preserves your saved lighting profiles. Opening or installing the apps never flashes firmware. The installer does not launch either app automatically.
@@ -54,7 +56,7 @@ Adaptive music uses Windows default playback loopback, processed locally in memo
 - For a sleeping/disconnected keyboard, press a key and allow the reconnect timer to run, or use Disconnect/Connect. The saved profile is restored only when that option is enabled.
 - Wireless sleep is firmware-volatile and reapplied from this computer's saved preference after reconnect. Continuous traffic may keep the device awake.
 - Built-in lighting can be active while the diagram lacks a live color preview; the firmware does not expose a stable built-in animation frame.
-- Bluetooth and 2.4 GHz are supported in code; only the connected Bluetooth hardware was available for this port's live read-only validation. Actual LED appearance, audio capture, sleep/wake, and long-running USB/receiver behavior still need a user hardware check.
+- Bluetooth and USB passed live read-only identity/state checks. Version 1.5.2.2 fixes the USB connection hang; receiver hardware remains untested. Actual LED appearance, audio capture, sleep/wake, and sustained streaming still need a user hardware check.
 
 ## Build and verify
 
