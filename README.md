@@ -1,10 +1,17 @@
 # GMK104 Lighting Studio — Per-key RGB for Windows and macOS
 
-**Unlock per-key RGB control on the ZUOYA GMK104 with compatible custom firmware.** Set a different color for each individual key, highlight WASD or other key groups, and combine layered ripple, reactive, music-responsive and other RGB effects. This is individual-key lighting control, not just a whole-keyboard color preset.
+**Add per-key RGB to the ZUOYA GMK104 on Windows and macOS.** Lighting Studio works with compatible custom firmware to give each of the 104 keys its own RGB color. Highlight WASD, color individual keys or key groups, and combine layered ripple, reactive, music-responsive and other lighting effects.
 
-The Windows port includes USB, 2.4 GHz and Bluetooth lighting transports, an installer with keyboard icons, and a separate guarded firmware flasher EXE. The macOS app and its existing source are retained below.
+**Compatible custom firmware is required:** installing the desktop app alone does not enable per-key RGB on stock firmware. Each platform has its own lighting app and separate firmware tool; see the platform guides for connection support and tested behavior.
 
-**[Download Windows installer and firmware flasher](https://github.com/danny67999/gmk104-lighting-studio/releases/tag/windows-v1.5.2.2)** · **[Windows guide](windows/README.md)**
+## Download for your platform
+
+| Platform | Download | Requirements | Guide |
+| --- | --- | --- | --- |
+| Windows | [Windows 1.5.2.2 installer and portable ZIP](https://github.com/danny67999/gmk104-lighting-studio/releases/tag/windows-v1.5.2.2) | Windows 10/11 x64, .NET Framework 4.8 | [Windows guide](windows/README.md) |
+| macOS | [macOS 1.4.1 apps and disk image (stable)](https://github.com/danny67999/gmk104-lighting-studio/releases/tag/v1.4.1) | Apple Silicon, macOS 13+; adaptive music requires macOS 14.2+ | [macOS guide](#macos-app) |
+
+[All releases](https://github.com/danny67999/gmk104-lighting-studio/releases) · [Per-key RGB guide](docs/per-key-rgb.md) · [Documentation hub](docs/README.md)
 
 **Windows 1.5.2.2 fixes the USB freeze at "Connecting and checking the keyboard."** Exit the old app and run the updated installer over your existing installation. Your profiles are preserved; no uninstall or firmware reflash is needed.
 
@@ -22,9 +29,9 @@ Windows requires Windows 10/11 x64, .NET Framework 4.8 and compatible custom GMK
 
 ## macOS app
 
-A native RGB lighting app for the wired ZUOYA GMK104, with layered effects, system-audio response, CPU temperature colors, and a companion firmware installer. The remaining instructions describe the macOS source currently in this repository; Windows behavior is documented separately above.
+The native macOS app provides per-key RGB lighting for the wired ZUOYA GMK104, with layered effects, system-audio response, CPU temperature colors, and a companion firmware installer. The remaining instructions describe the macOS source currently in this repository; Windows behavior is documented separately above.
 
-**[Download the Mac apps](https://github.com/danny67999/gmk104-lighting-studio/releases/latest)**
+**[Download the macOS apps](https://github.com/danny67999/gmk104-lighting-studio/releases/tag/v1.4.1)**
 
 Apple Silicon • macOS 13+ • Adaptive music requires macOS 14.2+
 
@@ -118,3 +125,9 @@ The public release includes automated verification and native Mac checks. Physic
 ## Release verification
 
 September 11, 2026: local automated suites passed. Live system-audio playback moved the activity meter and keyboard framebuffer; silence returned the meter to zero. The temperature layer read 18 CPU sensors on Apple M5 and streamed its measured color. Input Monitoring showed an active keyboard listener. Original layers and the saved LED map were preserved. The firmware installer passed offline golden-stream checks and live read-only v0.2 inspection. No firmware was flashed from the Mac. Version 1.4.1 adds saved FPS limits with reconnect/relaunch and unapplied-edit isolation tests.
+
+## License
+
+Current source uses the [GMK104 Free Use and No Resale License 1.0](LICENSE). **Free personal and internal business use, modification and free sharing are allowed. Selling the app or paid derivatives is prohibited without separate written permission.** This is a custom source-available license.
+
+The change takes effect for versions offered under the new license from September 14, 2026. Earlier MIT-licensed copies and existing release downloads retain their original permissions. Vendor-derived firmware and separately licensed third-party material are excluded; see [third-party notices](THIRD_PARTY_NOTICES.md).

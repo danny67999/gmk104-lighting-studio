@@ -96,3 +96,7 @@ The public release includes automated verification and native Mac checks. Physic
 ## Release verification
 
 September 11, 2026: local automated suites passed. Live system-audio playback moved the activity meter and keyboard framebuffer; silence returned the meter to zero. The temperature layer read 18 CPU sensors on Apple M5 and streamed its measured color. Input Monitoring showed an active keyboard listener. Original layers and the saved LED map were preserved. The firmware installer passed offline golden-stream checks and live read-only v0.2 inspection. No firmware was flashed from the Mac. Version 1.4.1 adds saved FPS limits with reconnect/relaunch and unapplied-edit isolation tests.
+
+## License
+
+Current source is covered by the [GMK104 Free Use and No Resale License 1.0](../LICENSE). Free personal and internal business use, modification and free sharing are allowed. Selling the app or paid derivatives requires separate written permission. Earlier MIT-licensed copies and existing release downloads retain their original permissions. Vendor-derived firmware and separately licensed third-party material are excluded.

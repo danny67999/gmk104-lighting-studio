@@ -1,24 +1,67 @@
-MIT License
+GMK104 Free Use and No Resale License 1.0
+Effective date: September 14, 2026
 
 Copyright (c) 2026 GMK104 Lighting Studio contributors
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+1. Scope
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+This license applies to original GMK104 Lighting Studio application code,
+documentation and project assets that the copyright holders offer under these
+terms (the "Software"). References to the Software include copies, modified
+versions and derivative works of that material. Vendor-derived firmware and
+separately licensed third-party material are excluded and retain their own
+licenses and notices. No rights to third-party trademarks are granted.
+
+2. Free use, modification and sharing
+
+Subject to the conditions below, permission is granted, free of charge, to
+use, copy, modify, merge, publish and distribute the Software. Personal use and
+internal business use are permitted. You may share source code or compiled
+versions without charge and may contribute improvements.
+
+3. No resale or paid distribution
+
+You may not sell, rent, lease, sublicense for a fee, or otherwise charge for
+copies of, access to, or use of the Software. This restriction also applies
+to modified versions and derivative works, including renamed or repackaged
+versions, paid downloads, paid feature unlocks and subscriptions.
+
+You may not evade this restriction by bundling the Software with a paid
+product or service and charging for the Software indirectly. Using the
+Software internally in a business does not, by itself, violate this condition.
+Fees for independent support or consulting are permitted only when they do
+not charge for copies of, access to, or functionality of the Software.
+Voluntary donations are permitted only when access, use and functionality
+are not conditional on payment.
+
+Commercial resale or paid distribution requires separate written permission
+from the relevant copyright holders.
+
+4. Notices and downstream terms
+
+Every distributed copy or substantial portion of the Software, including a
+modified or compiled version, must include this license and the applicable
+copyright and third-party notices. You must retain the restrictions above
+for the covered Software and may not grant recipients rights that conflict
+with them. Identify your modifications without implying endorsement by the
+original project or its contributors.
+
+5. Earlier versions
+
+These terms apply to versions offered under this license. They do not revoke
+permissions already granted for earlier copies under the MIT License or any
+other license. Previously published release artifacts retain the terms under
+which they were distributed.
+
+6. Warranty and liability
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
 AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE, TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW.
 
-This license applies to the application source and original project assets.
-It does not relicense vendor-derived firmware binaries or third-party material.
+This is a custom source-available license, not the MIT License or an
+OSI-approved open-source license.

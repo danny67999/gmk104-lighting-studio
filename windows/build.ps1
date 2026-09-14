@@ -13,6 +13,7 @@ if(Test-Path -LiteralPath $iconPath){$iconOptions+=('/win32icon:'+$iconPath)}
 & $compiler /nologo /target:winexe /platform:x64 /optimize+ /checked+ /main:Gmk104LightingStudio.Program "/out:$exePath" $iconOptions $references $sources
 if ($LASTEXITCODE -ne 0) { throw 'Windows Lighting Studio build failed.' }
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'Resources\layout.json'),(Join-Path $PSScriptRoot 'Resources\default-led-map.json') -Destination $outputPath -Force
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'LICENSE.txt'),(Join-Path $PSScriptRoot 'THIRD_PARTY_NOTICES.md') -Destination $outputPath -Force
 if (Test-Path -LiteralPath (Join-Path $PSScriptRoot 'README.md')) { Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'README.md') -Destination $outputPath -Force }
 if (Test-Path -LiteralPath (Join-Path $PSScriptRoot 'VERIFICATION.md')) { Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'VERIFICATION.md') -Destination $outputPath -Force }
 Write-Output "BUILD PASS: $exePath"

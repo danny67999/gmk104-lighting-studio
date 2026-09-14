@@ -2,6 +2,8 @@
 
 [Documentation home](README.md)
 
+Choose the Windows or macOS app for your computer. Lighting Studio plus compatible custom firmware adds **per-key RGB**, so each GMK104 key can have its own color. See [downloads for both platforms](../README.md#download-for-your-platform).
+
 ## Windows installation
 
 1. Download **GMK104-Lighting-Studio-Windows-Setup-1.5.2.2.exe** from the [Windows release](https://github.com/danny67999/gmk104-lighting-studio/releases/tag/windows-v1.5.2.2).
@@ -13,7 +15,7 @@
 
 Requirements: Windows 10/11 x64, .NET Framework 4.8 and compatible custom firmware. Builds are unsigned; only run trusted downloads. Do not disable Windows security protections to install this project.
 
-## Choose a connection
+## Windows connection options
 
 - **USB:** use a data-capable cable and switch the keyboard to wired mode. This is also the only connection allowed for firmware operations.
 - **Bluetooth:** pair the keyboard in Windows settings and select its paired Bluetooth mode on the keyboard. Lighting needs the custom firmware's Bluetooth service, not just a working typing connection.

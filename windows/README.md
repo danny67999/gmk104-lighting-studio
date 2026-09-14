@@ -65,3 +65,7 @@ Source is in the accompanying Windows source archive. Run `powershell -NoProfile
 For a read-only connection diagnostic, run the executable with `--probe` followed by an output text-file path. For an offline UI render (no device connection), use `--preview` followed by a PNG path and optional tab index 0, 1 or 2.
 
 Build the installer with `windows\Installer\build-installer.ps1 -InnoCompiler 'C:\path\to\ISCC.exe'` after installing [Inno Setup 6](https://jrsoftware.org/isdl.php). Icons are original code-drawn artwork; their reproducible source is `Installer/IconBuilder.cs`. Packaging version 1.5.2.1 added installation and icons; 1.5.2.2 fixes HID connection buffering. These development EXEs are unsigned, not publisher-verified builds.
+
+## License
+
+Current source is covered by the [GMK104 Free Use and No Resale License 1.0](LICENSE.txt). Free personal and internal business use, modification and free sharing are allowed. Selling the app or paid derivatives requires separate written permission. Earlier MIT-licensed copies and existing release downloads retain their original permissions. Vendor-derived firmware and separately licensed third-party material are excluded.

@@ -10,4 +10,4 @@ Core Audio capture follows Apple's [process-tap documentation](https://developer
 
 The original app icon was generated with an image-generation tool. Its creation prompt is included with the source artwork.
 
-The firmware images were transferred from this project's Windows build. They include vendor-derived firmware and are excluded from the MIT source-code license. No rights to unrelated vendor firmware or trademarks are granted.
+The firmware images were transferred from this project's Windows build. They include vendor-derived firmware and are excluded from the application source-code license. No rights to unrelated vendor firmware or trademarks are granted.

@@ -17,4 +17,8 @@
 
 Connection support is for **lighting control**. Firmware flashing is wired-USB-only on both platforms. Offline tests do not establish hardware compatibility or guarantee recovery.
 
-Current Windows documentation describes **1.5.2.2**. Downloads: [Windows release](https://github.com/danny67999/gmk104-lighting-studio/releases/tag/windows-v1.5.2.2) · [all releases](https://github.com/danny67999/gmk104-lighting-studio/releases).
+Current Windows documentation describes **1.5.2.2**. Downloads: [Windows release](https://github.com/danny67999/gmk104-lighting-studio/releases/tag/windows-v1.5.2.2) · [macOS stable release](https://github.com/danny67999/gmk104-lighting-studio/releases/tag/v1.4.1) · [all releases](https://github.com/danny67999/gmk104-lighting-studio/releases).
+
+## License
+
+[Free use and no resale](../LICENSE): personal and internal business use, modification and free sharing are allowed; selling the app or paid derivatives requires separate written permission. This applies to versions offered under the new license. Earlier MIT-licensed copies and existing release artifacts retain their original terms.

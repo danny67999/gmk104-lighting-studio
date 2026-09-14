@@ -9,6 +9,7 @@ xcrun swiftc -swift-version 5 -O -parse-as-library -target arm64-apple-macosx13.
   mac/Sources/*.swift -o "$APP/Contents/MacOS/GMK104RGBController"
 cp mac/Resources/*.json "$APP/Contents/Resources/"
 cp mac/Resources/AppIcon.icns "$APP/Contents/Resources/"
+cp LICENSE THIRD_PARTY_NOTICES.md "$APP/Contents/Resources/"
 cat > "$APP/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
