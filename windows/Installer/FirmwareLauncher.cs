@@ -10,14 +10,14 @@ using System.Windows.Forms;
 
 [assembly: AssemblyTitle("GMK104 Guarded Firmware Flasher")]
 [assembly: AssemblyProduct("GMK104 Guarded Firmware Flasher")]
-[assembly: AssemblyVersion("1.5.2.1")]
-[assembly: AssemblyFileVersion("1.5.2.1")]
+[assembly: AssemblyVersion("1.0.0.0")]
+[assembly: AssemblyFileVersion("1.0.0.0")]
 internal sealed class FirmwareLauncher : Form
 {
-    private static readonly string[] Targets={"Wireless","Streaming","Custom","Stock"};
-    private static readonly string[] Phrases={"TEST GMK104 WIRELESS 060C4E9E","TEST GMK104 BLUETOOTH 6F0AD0C1","FLASH GMK104 CUSTOM C6342859","RESTORE GMK104 STOCK B85531A2"};
-    private static readonly string[] Files={"GMK104-Guarded-Flasher.ps1","Run-Flasher.ps1","GMK104-custom-RGB-v0.2-experimental.bin","GMK104-custom-RGB-v0.3-experimental.bin","GMK104-custom-RGB-v0.4-experimental.bin","GMK104-stock-recovery.bin"};
-    private static readonly string[] Hashes={"96e431887f574cbe01e900ff08a803d8351ede421a982809e294f34b1e7f0fd4","cfb5604e1b861948078c0176801a74ef45727c96225145da82b25fb81b96dd8a","11db2cd854381021b45c0b025d7fabc5277cdbfed185a4e8af0e9327d7acc347","fd6e3e8b9d67e2e4942634fcb5c44275f1b1b4f6975f1691318c5a1d44e1661f"};
+    private static readonly string[] Targets={"Release","Custom","Wireless","Streaming","Stock"};
+    private static readonly string[] Phrases={"INSTALL GMK104 LIGHTING 7F2F4310","FLASH GMK104 CUSTOM C6342859","TEST GMK104 WIRELESS 060C4E9E","TEST GMK104 BLUETOOTH 6F0AD0C1","RESTORE GMK104 STOCK B85531A2"};
+    private static readonly string[] Files={"GMK104-Guarded-Flasher.ps1","Run-Flasher.ps1","GMK104-firmware-1.0.bin","GMK104-custom-RGB-v0.2-experimental.bin","GMK104-custom-RGB-v0.3-experimental.bin","GMK104-custom-RGB-v0.4-experimental.bin","GMK104-stock-recovery.bin"};
+    private static readonly string[] Hashes={"4bdc3e9729a0583f2daea150fa1ccf4374c5115046f3b8f0655a4758b1dfe22e","96e431887f574cbe01e900ff08a803d8351ede421a982809e294f34b1e7f0fd4","cfb5604e1b861948078c0176801a74ef45727c96225145da82b25fb81b96dd8a","11db2cd854381021b45c0b025d7fabc5277cdbfed185a4e8af0e9327d7acc347","fd6e3e8b9d67e2e4942634fcb5c44275f1b1b4f6975f1691318c5a1d44e1661f"};
     private ComboBox target;private TextBox phrase;private CheckBox ready;private Label expected,status;private Button flash;private FlowLayoutPanel panel;private bool running;
     private static string PowerShell {get{return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System),@"WindowsPowerShell\v1.0\powershell.exe");}}
     private static string Hash(byte[] data){using(var sha=SHA256.Create())return BitConverter.ToString(sha.ComputeHash(data)).Replace("-","").ToLowerInvariant();}
@@ -26,16 +26,11 @@ internal sealed class FirmwareLauncher : Form
         string path=Path.Combine(root,Guid.NewGuid().ToString("N"));Directory.CreateDirectory(path);
         for(int i=0;i<Files.Length;i++)
         {
-            using(var source=Assembly.GetExecutingAssembly().GetManifestResourceStream("Payload."+Files[i]))
-            {
-                if(source==null)throw new InvalidDataException("Missing embedded payload: "+Files[i]);
-                using(var memory=new MemoryStream())
-                {
-                    source.CopyTo(memory);byte[] data=memory.ToArray();
-                    if(i>=2&&Hash(data)!=Hashes[i-2])throw new InvalidDataException("Embedded firmware hash mismatch; nothing was sent.");
-                    using(var dest=new FileStream(Path.Combine(path,Files[i]),FileMode.CreateNew,FileAccess.Write,FileShare.Read))dest.Write(data,0,data.Length);
-                }
-            }
+            string installed=Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"Firmware",Files[i]);
+            byte[] data=File.ReadAllBytes(installed);
+            string expectedHash=i<2 ? FirmwareScriptPins.Hashes[i] : Hashes[i-2];
+            if(Hash(data)!=expectedHash)throw new InvalidDataException("Firmware package hash mismatch: "+Files[i]+". Nothing was sent.");
+            using(var dest=new FileStream(Path.Combine(path,Files[i]),FileMode.CreateNew,FileAccess.Write,FileShare.Read))dest.Write(data,0,data.Length);
         }
         return path;
     }
@@ -63,7 +58,7 @@ internal sealed class FirmwareLauncher : Form
                     string result=output.Result+error.Result;File.WriteAllText(Path.Combine(session,chosen+"-offline.txt"),result);
                     if(p.ExitCode!=0||!result.Contains("OFFLINE DRY RUN COMPLETE"))throw new InvalidOperationException(chosen+" offline validation failed: "+result);
                 }
-                File.WriteAllText(Path.Combine(session,"PASS.txt"),"All four embedded firmware images and packet plans passed offline. No HID device was opened.");return 0;
+                File.WriteAllText(Path.Combine(session,"PASS.txt"),"All five published firmware images and packet plans passed offline. No HID device was opened.");return 0;
             }catch(Exception e){Directory.CreateDirectory(args[1]);File.WriteAllText(Path.Combine(args[1],"FAIL.txt"),e.ToString());return 1;}
         }
         Application.EnableVisualStyles();Application.SetCompatibleTextRenderingDefault(false);Application.Run(new FirmwareLauncher());return 0;
@@ -74,9 +69,9 @@ internal sealed class FirmwareLauncher : Form
         Font=new Font("Segoe UI",10);BackColor=Color.FromArgb(19,24,31);ForeColor=Color.FromArgb(235,240,247);Icon=Icon.ExtractAssociatedIcon(Application.ExecutablePath);
         panel=new FlowLayoutPanel{Dock=DockStyle.Fill,FlowDirection=FlowDirection.TopDown,WrapContents=false,AutoScroll=true,Padding=new Padding(22)};Controls.Add(panel);
         AddLabel("GMK104  /  FIRMWARE",40,18);
-        AddLabel("WIRED USB ONLY • Experimental custom firmware",32,11);
-        AddLabel("Opening this app does not contact or flash the keyboard. If lighting already works over Bluetooth, no firmware update is needed.",56,10);
-        target=new ComboBox{DropDownStyle=ComboBoxStyle.DropDownList,Width=710};target.Items.AddRange(new[]{"v0.3 Wireless — from v0.2 or v0.4","v0.4 Streaming — experimental, from v0.3 only","v0.2 Custom — wired legacy","Stock recovery — requires a working USB interface"});target.SelectedIndex=0;panel.Controls.Add(target);
+        AddLabel("WIRED USB ONLY • Persistent lighting and guarded rollback",32,11);
+        AddLabel("Opening this app does not contact or flash the keyboard. Complete firmware 1.0 includes per-key RGB, sixteen persistent layers, reactive effects, Matrix rain and corrected Aurora. The other choices are the four legacy images already released on GitHub. Switching between Mac and PC does not require reflashing.",56,10);
+        target=new ComboBox{DropDownStyle=ComboBoxStyle.DropDownList,Width=710};target.Items.AddRange(new[]{"Complete lighting firmware 1.0 — all effects and persistent layers","GitHub legacy custom v0.2 — host RGB playback","GitHub legacy wireless v0.3","GitHub legacy Bluetooth v0.4","GitHub stock recovery — responding wired USB required"});target.SelectedIndex=0;panel.Controls.Add(target);
         var actions=new FlowLayoutPanel{Width=740,Height=48};actions.Controls.Add(Button("Validate files (offline)","DryRun"));actions.Controls.Add(Button("Inspect USB keyboard","Inspect"));actions.Controls.Add(Button("Test USB connection","TestConnection"));panel.Controls.Add(actions);
         AddLabel("Before flashing: close Lighting Studio and other keyboard utilities. Connect one GMK104 in wired mode. Keep the cable and computer power connected. Never retry an uncertain upload automatically.",74,10);
         ready=new CheckBox{Text="I understand the risk and have a stable wired USB connection.",AutoSize=true,Margin=new Padding(3,8,3,8)};panel.Controls.Add(ready);
@@ -94,7 +89,7 @@ internal sealed class FirmwareLauncher : Form
         if(mode=="Flash")
         {
             if(!ready.Checked||confirmation!=Phrases[target.SelectedIndex])return;
-            if(MessageBox.Show(this,"Flash "+chosen+" firmware over wired USB? An interrupted or incompatible update can disable the keyboard. The guarded flasher will also request confirmation in its console.","Confirm firmware operation",MessageBoxButtons.YesNo,MessageBoxIcon.Warning,MessageBoxDefaultButton.Button2)!=DialogResult.Yes)return;
+            if(MessageBox.Show(this,"Flash "+chosen+" firmware over wired USB? An interrupted or incompatible update can disable the keyboard. Permanent storage uses a reverse-engineered layout; failed boot may require hardware recovery. The guarded flasher will also request confirmation in its console.","Confirm firmware operation",MessageBoxButtons.YesNo,MessageBoxIcon.Warning,MessageBoxDefaultButton.Button2)!=DialogResult.Yes)return;
         }
         running=true;panel.Enabled=false;status.Text="Operation running. Read the separate results window; keep USB connected during flashing.";
         try

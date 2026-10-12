@@ -80,7 +80,7 @@ namespace Gmk104LightingStudio
         }
         public static void ValidateLayers(List<LightingLayer> layers, KeyGeometry[] keys = null)
         {
-            PersistJson.Require(layers != null && layers.Count >= 1 && layers.Count <= Limit && layers.All(x => x != null), "Use between 1 and 16 lighting layers.");
+            PersistJson.Require(layers != null && layers.Count <= Limit && layers.All(x => x != null), "Use up to 16 lighting layers.");
             foreach (var layer in layers) layer.Validate(keys);
             PersistJson.Require(layers.Select(x => Guid.Parse(x.id)).Distinct().Count() == layers.Count, "Lighting layers must have unique identifiers.");
         }
@@ -109,6 +109,7 @@ namespace Gmk104LightingStudio
         public bool restoreOnReconnect = true, resume = true;
         public List<LightingLayer> layers = new List<LightingLayer> { new LightingLayer() };
         public int? frameRate;
+        public MappingFile mapping;
         [ScriptIgnore] public List<LightingLayer> StudioLayers
         {
             get { return layers ?? new List<LightingLayer> { new LightingLayer(settings) { id = "00000000-0000-4000-8000-000000000001" } }; }
@@ -119,14 +120,16 @@ namespace Gmk104LightingStudio
             PersistJson.Require(mode == "studio" || mode == "builtIn" || mode == "frame", "Unknown saved lighting mode.");
             PersistJson.Require(settings != null, "Profile is missing its settings."); settings.Validate();
             if (frameRate.HasValue) PersistJson.Require(new[] { 15, 30, 60, 90, 120 }.Contains(frameRate.Value), "Animation FPS must be 15, 30, 60, 90 or 120.");
+            if (mapping != null) mapping.Validate(keys);
             if (layers != null) LightingLayer.ValidateLayers(layers, keys);
             PersistJson.Require(!(version == 2 && mode == "studio" && layers == null), "Saved studio profile is missing its layers.");
-            PersistJson.Require(builtInEffect >= 0 && builtInEffect <= 18, "Saved built-in effect is invalid.");
+            PersistJson.Require((builtInEffect >= 0 && builtInEffect <= 18 || builtInEffect == 20), "Saved built-in effect is invalid.");
             if (mode == "frame") PersistJson.Require(colors != null && colors.Length == 104, "Saved lighting frame must contain 104 colors.");
         }
         public LightingProfile Clone()
         {
             var p = (LightingProfile)MemberwiseClone(); p.settings = settings.Clone(); p.colors = colors == null ? null : (RGB[])colors.Clone();
+            p.mapping = mapping == null ? null : mapping.Clone();
             p.layers = layers == null ? null : layers.Select(x => x.Clone()).ToList(); return p;
         }
         public void Save(string path) { Validate(); PersistJson.Save(path, this); }
@@ -140,6 +143,7 @@ namespace Gmk104LightingStudio
                 layers = null, frameRate = PersistJson.OptionalInt(j, "frameRate") };
             if (j.TryGetValue("layers", out optional) && optional != null) p.layers = PersistJson.Array(j, "layers").Select(LightingLayer.FromJson).ToList();
             if (j.TryGetValue("colors", out optional) && optional != null) p.colors = PersistJson.Array(j, "colors").Select(PersistJson.Color).ToArray();
+            if (j.TryGetValue("mapping", out optional) && optional != null) p.mapping = MappingFile.FromJson(optional);
             p.Validate(); return p;
         }
     }
@@ -179,16 +183,18 @@ namespace Gmk104LightingStudio
     public static class LightingEngine
     {
         public const int LedCount = 104;
-        public static readonly string[] Effects = { "ripple", "rainbowRipple", "reactive", "wave", "breathing", "spectrum", "staticColor", "adaptiveMusic", "cpuTemperature" };
+        public static readonly string[] Effects = { "ripple", "rainbowRipple", "reactive", "wave", "breathing", "spectrum", "staticColor", "adaptiveMusic", "cpuTemperature", "keyHold", "starlight", "rainbowStarlight", "fire", "colorWheel", "scanner", "comet", "rain", "aurora", "keyToggle", "rainbowReactive", "splash", "crossRipple", "rowWave", "columnWave", "matrixRain", "spacedMatrixRain", "matrixKeyRain", "radar" };
         public static string DisplayName(string effect)
         {
             switch (effect) { case "ripple": return "Ripple"; case "rainbowRipple": return "Rainbow ripple"; case "reactive": return "Reactive";
                 case "wave": return "Rainbow wave"; case "breathing": return "Breathing"; case "spectrum": return "Spectrum cycle";
-                case "staticColor": return "Static color"; case "adaptiveMusic": return "Adaptive music"; case "cpuTemperature": return "CPU temperature"; default: return effect; }
+                case "staticColor": return "Static color"; case "adaptiveMusic": return "Adaptive music"; case "cpuTemperature": return "CPU temperature"; case "keyHold": return "Hold (press/release)"; case "starlight": return "Starlight";
+                case "rainbowStarlight": return "Rainbow starlight"; case "fire": return "Fire"; case "colorWheel": return "Color wheel";
+                case "scanner": return "Scanner"; case "comet": return "Comet"; case "rain": return "Rain"; case "aurora": return "Aurora"; case "radar": return "Radar"; case "keyToggle": return "Key toggle"; case "rainbowReactive": return "Rainbow reactive"; case "splash": return "Splash"; case "crossRipple": return "Cross ripple"; case "rowWave": return "Row wave"; case "columnWave": return "Column wave"; case "matrixRain": return "Matrix rain"; case "spacedMatrixRain": return "Spaced matrix rain"; case "matrixKeyRain": return "Matrix key rain"; default: return effect; }
         }
-        public static bool RequiresKeyPresses(string effect) { return effect == "ripple" || effect == "rainbowRipple" || effect == "reactive"; }
-        public static bool RequiresMapping(string effect) { return RequiresKeyPresses(effect) || effect == "wave" || effect == "adaptiveMusic"; }
-        public static bool UsesSelectedColor(string effect) { return effect != "wave" && effect != "spectrum" && effect != "rainbowRipple" && effect != "adaptiveMusic" && effect != "cpuTemperature"; }
+        public static bool RequiresKeyPresses(string effect) { return new[] { "ripple", "rainbowRipple", "reactive", "keyHold", "keyToggle", "rainbowReactive", "splash", "crossRipple", "rowWave", "columnWave", "matrixKeyRain" }.Contains(effect); }
+        public static bool RequiresMapping(string effect) { return effect != "staticColor" && effect != "breathing" && effect != "spectrum" && effect != "cpuTemperature"; }
+        public static bool UsesSelectedColor(string effect) { return !new[] { "wave", "spectrum", "rainbowRipple", "adaptiveMusic", "cpuTemperature", "rainbowStarlight", "fire", "colorWheel", "aurora", "rainbowReactive" }.Contains(effect); }
         public static double MaximumPulseAge(LightingSettings settings) { return 4.5 / settings.Normalized().speed; }
         public static List<KeyPulse> AdjustPulses(List<KeyPulse> pulses, double previous, double now, double maximumStep)
         {
@@ -198,7 +204,7 @@ namespace Gmk104LightingStudio
         }
 
         // Layers are displayed topmost first and compose into one framebuffer.
-        public static RGB[] Render(List<LightingLayer> layers, KeyGeometry[] keys, MappingFile mapping, List<KeyPulse> pulses, double time, LightingInputs inputs = null)
+        public static RGB[] Render(List<LightingLayer> layers, KeyGeometry[] keys, MappingFile mapping, List<KeyPulse> pulses, double time, LightingInputs inputs = null, HashSet<string> heldKeys = null, HashSet<string> toggledKeys = null)
         {
             var result = new RGB[LedCount];
             if (layers == null) return result;
@@ -210,11 +216,14 @@ namespace Gmk104LightingStudio
                 if (layer == null || layer.settings == null || !layer.enabled || !Finite(layer.opacity) || layer.opacity <= 0 || (layer.keyIDs != null && layer.keyIDs.Count == 0)) continue;
                 double opacity = Math.Min(1, layer.opacity);
                 var layerPulses = RequiresKeyPresses(layer.settings.effect) ? pulses.Where(x => x != null && layer.AcceptsTrigger(x.keyID)).ToList() : pulses;
-                var colors = RenderEffect(layer.settings, keys, mapping, layerPulses, time, layer.affectAllKeys, inputs);
+                var layerHeld = heldKeys == null ? new HashSet<string>() : new HashSet<string>(heldKeys.Where(layer.AcceptsTrigger));
+                var layerToggled = toggledKeys == null ? new HashSet<string>() : new HashSet<string>(toggledKeys.Where(layer.AcceptsTrigger));
+                var colors = RenderEffect(layer.settings, keys, mapping, layerPulses, time, layer.affectAllKeys, inputs, layerHeld, layerToggled);
                 var white = layer.settings.Clone(); white.color = new RGB(255, 255, 255);
                 if (white.effect == "rainbowRipple") white.effect = "ripple";
-                var coverage = UsesSelectedColor(layer.settings.effect) || layer.settings.effect == "rainbowRipple"
-                    ? RenderEffect(white, keys, mapping, layerPulses, time, layer.affectAllKeys, inputs) : colors;
+                if (white.effect == "rainbowReactive") white.effect = "reactive";
+                var coverage = UsesSelectedColor(layer.settings.effect) || layer.settings.effect == "rainbowRipple" || layer.settings.effect == "rainbowReactive"
+                    ? RenderEffect(white, keys, mapping, layerPulses, time, layer.affectAllKeys, inputs, layerHeld, layerToggled) : colors;
                 HashSet<int> mask = layer.affectAllKeys || layer.keyIDs == null ? null : new HashSet<int>(safeKeys.Where(x => layer.keyIDs.Contains(x.id)).Select(x => x.index));
                 for (int i = 0; i < LedCount; i++)
                 {
@@ -227,7 +236,7 @@ namespace Gmk104LightingStudio
             return result;
         }
 
-        public static RGB[] RenderEffect(LightingSettings settings, KeyGeometry[] keys, MappingFile mapping, List<KeyPulse> pulses, double time, bool reactiveAffectsAllKeys = false, LightingInputs inputs = null)
+        public static RGB[] RenderEffect(LightingSettings settings, KeyGeometry[] keys, MappingFile mapping, List<KeyPulse> pulses, double time, bool reactiveAffectsAllKeys = false, LightingInputs inputs = null, HashSet<string> heldKeys = null, HashSet<string> toggledKeys = null)
         {
             settings = (settings ?? new LightingSettings()).Normalized(); inputs = inputs ?? new LightingInputs();
             var frame = new RGB[LedCount]; if (settings.intensity == 0) return frame;
@@ -243,10 +252,46 @@ namespace Gmk104LightingStudio
                     double? temp = inputs.Temperature(time); if (!temp.HasValue) return frame;
                     double fraction = Math.Min(1, Math.Max(0, (temp.Value - settings.temperatureCold) / (settings.temperatureHot - settings.temperatureCold)));
                     return Solid(HueColor((1 - fraction) * (2.0 / 3), settings.intensity));
-                case "ripple": case "rainbowRipple": case "reactive": case "wave": case "adaptiveMusic": break;
+                case "ripple": case "rainbowRipple": case "reactive": case "wave": case "adaptiveMusic": case "radar": case "keyHold": case "starlight": case "rainbowStarlight": case "fire": case "colorWheel": case "scanner": case "comet": case "rain": case "aurora": case "keyToggle": case "rainbowReactive": case "splash": case "crossRipple": case "rowWave": case "columnWave": case "matrixRain": case "spacedMatrixRain": case "matrixKeyRain": break;
                 default: return frame;
             }
             var mapped = ConfirmedKeys(keys ?? new KeyGeometry[0], mapping);
+            if (settings.effect == "spacedMatrixRain" || settings.effect == "matrixKeyRain") {
+                var known=new HashSet<string>(mapped.Select(k=>k.id));
+                var validPulses=pulses.Where(k=>k!=null&&known.Contains(k.keyID)).ToList();
+                foreach(var key in mapped) frame[key.index]=settings.effect=="spacedMatrixRain" ? LogicalMatrixRaster.Automatic(key.id,clock,settings) : LogicalMatrixRaster.Reactive(key.id,clock,validPulses,settings);
+                return frame;
+            }
+            if (settings.effect == "matrixRain")
+            {
+                if (mapped.Count == 0) return frame;
+                int minY = mapped.Min(k => (int)Math.Round(k.y * 2, MidpointRounding.AwayFromZero));
+                int maxY = mapped.Max(k => (int)Math.Round(k.y * 2, MidpointRounding.AwayFromZero));
+                foreach (var key in mapped) frame[key.index] = MatrixRainRaster.Pixel((int)Math.Round(key.x * 2, MidpointRounding.AwayFromZero), (int)Math.Round(key.y * 2, MidpointRounding.AwayFromZero), minY, maxY, clock, settings);
+                return frame;
+            }
+            if (settings.effect == "radar")
+            {
+                if (mapped.Count == 0) return frame;
+                double cx = (mapped.Min(k => k.x) + mapped.Max(k => k.x)) / 2;
+                double cy = (mapped.Min(k => k.y) + mapped.Max(k => k.y)) / 2;
+                double sweep = Wrapped(clock, 4 / settings.speed) * 2 * Math.PI;
+                foreach (var key in mapped)
+                {
+                    double dx = key.x - cx, dy = key.y - cy;
+                    double behind = (sweep - Math.Atan2(dy, dx) + 4 * Math.PI) % (2 * Math.PI);
+                    double level = dx * dx + dy * dy < 0.000001 ? 1 : Math.Exp(-behind * 2.5);
+                    frame[key.index] = Scale(settings.color, level * settings.intensity);
+                }
+                return frame;
+            }
+            if (settings.effect == "keyHold" || settings.effect == "keyToggle")
+            {
+                var litKeys = (settings.effect == "keyToggle" ? toggledKeys : heldKeys) ?? new HashSet<string>();
+                if (!mapped.Any(x => litKeys.Contains(x.id))) return frame;
+                foreach (var key in mapped.Where(x => reactiveAffectsAllKeys || litKeys.Contains(x.id))) frame[key.index] = Scale(settings.color, settings.intensity);
+                return frame;
+            }
             if (settings.effect == "adaptiveMusic")
             {
                 var audio = (inputs.music ?? new MusicSample()).Fresh(time);
@@ -267,6 +312,33 @@ namespace Gmk104LightingStudio
                 foreach (var key in mapped) frame[key.index] = HueColor(key.x / 8 + key.y * (0.35 / 8) - phase, settings.intensity);
                 return frame;
             }
+            if (new[] { "starlight", "rainbowStarlight", "fire", "colorWheel", "scanner", "comet", "rain", "aurora" }.Contains(settings.effect))
+            {
+                if (mapped.Count == 0) return frame;
+                double minX = mapped.Min(x => x.x), maxX = mapped.Max(x => x.x), minY = mapped.Min(x => x.y), maxY = mapped.Max(x => x.y);
+                double movement = Wrapped(clock, 4 / settings.speed);
+                foreach (var key in mapped)
+                {
+                    double x = (key.x - minX) / Math.Max(1, maxX - minX), y = (key.y - minY) / Math.Max(1, maxY - minY); RGB color = RGB.Black;
+                    switch (settings.effect)
+                    {
+                        case "starlight": case "rainbowStarlight":
+                            double moment = Wrapped(clock, 8 / settings.speed) * 8, tick = Math.Floor(moment), progress = moment - tick;
+                            double seed = Noise(key.index * 13.31 + tick * 71.9), glow = seed > .80 ? Math.Pow(Math.Sin(Math.PI * progress), 2) : 0;
+                            color = settings.effect == "starlight" ? Scale(settings.color, glow * settings.intensity) : HueColor(Noise(key.index * 5.17 + tick * 3.77), glow * settings.intensity); break;
+                        case "fire":
+                            double flicker = Noise(key.index * 7.11 + Math.Floor(Wrapped(clock, 16 / settings.speed) * 32) * 23.3), flame = Math.Max(.08, .85 - y * .52 + flicker * .38);
+                            color = HueColor(.005 + (1 - y) * .09 + flicker * .025, flame * settings.intensity); break;
+                        case "colorWheel": color = HueColor(Math.Atan2(y - .5, x - .5) / (2 * Math.PI) + movement, settings.intensity); break;
+                        case "scanner": double distance = Math.Abs(x - (1 - Math.Abs(2 * movement - 1))); color = Scale(settings.color, Math.Exp(-distance * distance / .003) * settings.intensity); break;
+                        case "comet": double tail = movement * 1.3 - .15 - x; color = Scale(settings.color, (tail < 0 ? Math.Exp(-Math.Pow(tail / .025, 2)) : Math.Exp(-tail / .12)) * settings.intensity); break;
+                        case "rain": double drop = Wrapped(Wrapped(clock, 3 / settings.speed) + Noise(Math.Floor(key.x * 1.6) * 12.7), 1), delta = Math.Abs(y - drop); color = Scale(settings.color, Math.Exp(-Math.Pow(Math.Min(delta, 1 - delta) / .10, 2)) * settings.intensity); break;
+                        case "aurora": double fold = Math.Sin(x * 13 + movement * 4 * Math.PI + y * 3), band = Math.Exp(-Math.Pow((y - .48 - .22 * fold) / .28, 2)); color = HueColor(.38 + .12 * Math.Sin(x * 6 - movement * 2 * Math.PI), (.08 + .92 * band) * settings.intensity); break;
+                    }
+                    frame[key.index] = color;
+                }
+                return frame;
+            }
             if (!Finite(time)) return frame;
             var origins = mapped.ToDictionary(x => x.id); var active = new List<ActivePulse>();
             foreach (var pulse in pulses ?? new List<KeyPulse>())
@@ -282,17 +354,26 @@ namespace Gmk104LightingStudio
                 double level = 0, red = 0, green = 0, blue = 0;
                 foreach (var pulse in active)
                 {
-                    if (settings.effect == "reactive")
+                    if (settings.effect == "reactive" || settings.effect == "rainbowReactive")
                     {
                         if ((!reactiveAffectsAllKeys && key.id != pulse.origin.id) || pulse.age >= 1.4) continue;
-                        double remaining = 1 - pulse.age / 1.4; level += remaining * remaining;
+                        double remaining = 1 - pulse.age / 1.4, contribution = remaining * remaining; level += contribution;
+                        if (settings.effect == "rainbowReactive") {
+                            RGB color = HueColor(pulse.origin.index * .618 + pulse.age * .4, 1);
+                            red += color.r * contribution; green += color.g * contribution; blue += color.b * contribution;
+                        }
                     }
                     else
                     {
-                        double distance = Distance(key.x - pulse.origin.x, key.y - pulse.origin.y), radius = pulse.age * 8;
-                        double width = 0.6 + radius * 0.045, offset = (distance - radius) / width;
-                        double travelFade = 1 - 0.2 * Math.Min(1, radius / Math.Max(1, pulse.reach));
-                        double exitFade = Math.Max(0, 1 - Math.Max(0, radius - pulse.reach) / (width * 3));
+                        double dx = Math.Abs(key.x - pulse.origin.x), dy = Math.Abs(key.y - pulse.origin.y);
+                        double distance = Distance(dx, dy), reach = pulse.reach;
+                        if (settings.effect == "rowWave") { distance = dx; reach = mapped.Max(x => Math.Abs(x.x - pulse.origin.x)); }
+                        if (settings.effect == "columnWave") { distance = dy; reach = mapped.Max(x => Math.Abs(x.y - pulse.origin.y)); }
+                        if (settings.effect == "crossRipple") { if (Math.Min(dx, dy) > .75) continue; distance = Math.Max(dx, dy); reach = mapped.Max(x => Math.Max(Math.Abs(x.x - pulse.origin.x), Math.Abs(x.y - pulse.origin.y))); }
+                        double radius = pulse.age * (settings.effect == "splash" ? 6 : 8);
+                        double width = 0.6 + radius * 0.045, offset = (settings.effect == "splash" ? Math.Max(0, distance - radius) : distance - radius) / width;
+                        double travelFade = 1 - 0.2 * Math.Min(1, radius / Math.Max(1, reach));
+                        double exitFade = Math.Max(0, 1 - Math.Max(0, radius - reach) / (width * 3));
                         double contribution = Math.Exp(-0.5 * offset * offset) * travelFade * exitFade * exitFade;
                         level += contribution;
                         if (settings.effect == "rainbowRipple")
@@ -302,7 +383,7 @@ namespace Gmk104LightingStudio
                         }
                     }
                 }
-                if (settings.effect == "rainbowRipple")
+                if (settings.effect == "rainbowRipple" || settings.effect == "rainbowReactive")
                 {
                     double amount = settings.intensity / Math.Max(1, level);
                     frame[key.index] = new RGB(Byte(red * amount), Byte(green * amount), Byte(blue * amount));
@@ -339,6 +420,7 @@ namespace Gmk104LightingStudio
         public static int Peak(RGB color) { return Math.Max(color.r, Math.Max(color.g, color.b)); }
         private static byte Byte(double value) { return (byte)Math.Round(ClampFinite(value, 0, 255, 0), MidpointRounding.AwayFromZero); }
         private static RGB[] Solid(RGB color) { return Enumerable.Repeat(color, LedCount).ToArray(); }
+        private static double Noise(double seed) { double value = Math.Sin(seed * 12.9898) * 43758.5453; return value - Math.Floor(value); }
         private static double Wrapped(double time, double period) { double phase = (time % period) / period; return phase < 0 ? phase + 1 : phase; }
         private static double Distance(double x, double y) { x = Math.Abs(x); y = Math.Abs(y); double max = Math.Max(x, y); if (max == 0) return 0; return max * Math.Sqrt((x / max) * (x / max) + (y / max) * (y / max)); }
         private static RGB Scale(RGB color, double level) { double amount = ClampFinite(level, 0, 1, 0); return new RGB(Byte(color.r * amount), Byte(color.g * amount), Byte(color.b * amount)); }

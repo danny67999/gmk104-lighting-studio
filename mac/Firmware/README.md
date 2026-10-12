@@ -1,53 +1,11 @@
-# GMK104 firmware installer
+# Firmware installer 1.0
 
-The Mac app installs **custom RGB v0.2** or restores the approved **stock firmware** on one wired ZUOYA GMK104. It contains the exact images from the PC build transferred with this project. Custom v0.2 was successfully flashed on Windows and verified with direct RGB, indexed LED readback and full-frame checksums. The Mac port preserves the same complete upload stream.
+The Mac and Windows installers ship the same five hash-pinned images: complete lighting firmware 1.0, legacy custom v0.2/v0.3/v0.4, and stock recovery. These legacy images were already included in published GitHub releases. The intermediate local test builds are not offered by either installer. See `firmware-catalog.json` at the repository root for exact hashes.
 
-## Use
+Use a USB data cable, wired mode, stable computer power and one GMK104. Close Lighting Studio and other keyboard tools before the installer's inspection and transfer. Mac may require Input Monitoring and administrator approval for exclusive HID access. Windows provides offline validation, read-only inspection and a connection test before the explicit flash action.
 
-1. Quit GMK104 RGB Controller and other keyboard utilities.
-2. Open GMK104 Firmware Installer from Applications. Its first check is entirely offline.
-3. Connect one GMK104 directly over wired USB and click **Inspect keyboard**. Inspection sends passive version, CRC and RGB/VIA queries; it does not send OTA START.
-4. Choose Custom RGB v0.2 or Stock firmware. If it is already installed, no update is offered.
-5. Connect Mac power, read the on-screen precautions, select the readiness checkbox and type the exact displayed phrase.
-6. Click Install or Restore. Leave the app open and USB connected while it uploads and verifies the reboot.
+The complete 1.0 image is 174,372 bytes, CRC 7F2F4310, SHA-256 4BDC3E9729A0583F2DAEA150FA1CCF4374C5115046F3B8F0655A4758B1DFE22E. It is the prior complete local v1.8 image with a public 1.0 filename, not the older local persistent v1.0 image. Known legacy identities remain recognized for supported upgrades and rollback. Unknown identities are rejected; rollback still requires working USB.
 
-Custom firmware is experimental. Stock rollback requires the keyboard to boot and expose its normal OTA and RGB interfaces. No USB-dead rescue or automatic crash rollback has been verified.
+Each flashing exchange may wait up to one minute. A separate overall deadline bounds the operation. If a transfer times out or loses its response, read its logs and check the keyboard's current state before another attempt. The tool does not automatically retry an uncertain flash. Never assume success just because progress reached the last block.
 
-## Approved images
-
-| Target | Firmware CRC | SHA-256 |
-| --- | --- | --- |
-| Custom RGB v0.2 | `C6342859` | `96E431887F574CBE01E900FF08A803D8351EDE421A982809E294F34B1E7F0FD4` |
-| Stock rollback | `B85531A2` | `FD6E3E8B9D67E2E4942634FCB5C44275F1B1B4F6975F1691318C5A1D44E1661F` |
-
-Custom installation is allowed only from approved stock. Stock rollback is allowed from v0.2 or the retired v0.1 CRC `C077F2F5`. The retired v0.1 image is not bundled or installable.
-
-## Checks
-
-- Full image SHA-256, internal size, KNLT header, CRC32 and zero residue.
-- The complete padded image and all 2,924 OTA packets (START, 2,922 data packets, END) match the verified PC flasher's golden hashes. Every packet contains the same indexed chunks and CRC16 values.
-- Exact product `ZUOYA GMK104`, manufacturer `RDR`, USB version `0111`, VID/PID, report sizes and both interface usages (`FFEF:0000` OTA; `FF60:0061` RGB).
-- Both interfaces must share the same physical IOUSBHostDevice registry parent and USB port. Exactly one pair is allowed.
-- The keyboard is re-inspected after confirmation. The exclusively opened OTA handle returns the same approved firmware identity twice immediately before START.
-- Only the OTA interface is seized; keyboard input interfaces are not opened.
-- One installer lock, a macOS sleep assertion, bounded transfer deadline and no retransmission of uncertain packets.
-- Success requires the target CRC and command interface after reboot on the same USB port. Custom v0.2 also requires its exact RGB signature.
-
-Logs are kept in `~/Library/Logs/GMK104/`. If an upload fails or the result is indeterminate, keep the log, wait for USB, reconnect once if needed, and inspect. Do not automatically flash again. If the expected interfaces or an approved CRC do not return, software recovery is not assured.
-
-## Non-flashing command-line checks
-
-```sh
-"/Applications/GMK104 Firmware Installer.app/Contents/MacOS/GMK104FirmwareInstaller" --dry-run
-"/Applications/GMK104 Firmware Installer.app/Contents/MacOS/GMK104FirmwareInstaller" --inspect
-```
-
-`--dry-run` is entirely offline. `--inspect` requires Lighting Studio to be closed and performs only passive queries. Flashing is available only through the app's confirmation screen.
-
-## Validation limits
-
-Both Mac packet plans match the verified Windows packet streams byte for byte. Automated tests cover modified files, wrong identities, approved transitions, acknowledgment failures, deadlines and uncertain writes. Live Mac inspection confirmed custom v0.2 CRC `C6342859` and its RGB signature on the connected keyboard.
-
-No real Mac flash was performed: the test keyboard already runs v0.2. The installer is therefore experimental. Packet equivalence and read-only inspection do not prove the entire Mac upload/reboot path, long-term firmware reliability, all key/LED labels, wireless behavior or recovery from a non-enumerating keyboard.
-
-The bundled binaries contain vendor-derived firmware. The source-code license does not grant rights to unrelated vendor firmware or trademarks.
+Persistent storage is reverse engineered and checked by the firmware before committing. A failed boot can require hardware recovery. Neither application installation nor opening the firmware tool flashes anything automatically. The 1.0 release preparation runs offline tests and does not flash a physical keyboard.

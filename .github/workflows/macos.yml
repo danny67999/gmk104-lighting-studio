@@ -9,6 +9,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Test renderers, persistence, USB and firmware plans
         run: ./mac/test.sh
+      - name: Verify public firmware catalog
+        run: python3 scripts/verify-release-catalog.py
       - name: Build both apps
         run: |
           ./mac/build.sh

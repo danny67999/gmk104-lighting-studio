@@ -33,6 +33,13 @@ import Foundation
         }
         print("PASS: studio, built-in and frame profiles preserve settings, colors and both restore/resume flags")
 
+        let nativeProfile = LightingProfile(mode: .builtIn, settings: settings, builtInEffect: 20)
+        try nativeProfile.save(to: url)
+        let loadedNativeProfile = try LightingProfile.load(from: url)
+        assert(loadedNativeProfile?.builtInEffect == 20)
+        try expected.save(to: url)
+        print("PASS: on-keyboard effect 20 survives profile save and reload")
+
         let validData = try Data(contentsOf: url)
         var invalid = expected
         invalid.version = 3
@@ -52,7 +59,7 @@ import Foundation
             invalid = expected; invalid.settings.brightness = badBrightness
             try rejectsFile(invalid, at: url, label: "invalid saved brightness")
         }
-        for badEffect in [-1, 19] {
+        for badEffect in [-1, 19, 21] {
             invalid = expected; invalid.builtInEffect = badEffect
             try rejectsFile(invalid, at: url, label: "invalid saved built-in effect")
         }
@@ -94,8 +101,22 @@ import Foundation
         let savedRainbow = try LightingProfile.load(from: url)!
         assert(savedRainbow.layers == rainbow.layers && savedRainbow.settings.effect == .rainbowRipple)
         print("PASS: Rainbow ripple saves and reloads with its trigger keys, reach, speed and layer order intact")
+        for newEffect: LightingEffect in [.keyHold, .starlight, .rainbowStarlight, .fire,
+                                          .colorWheel, .scanner, .comet, .rain, .aurora] {
+            var newLayer = top
+            newLayer.settings.effect = newEffect
+            newLayer.settings.speed = 1.75
+            let newProfile = LightingProfile(mode: .studio, settings: newLayer.settings, layers: [newLayer, bottom])
+            try newProfile.save(to: url)
+            let restored = try LightingProfile.load(from: url)
+            assert(restored?.layers == newProfile.layers && restored?.settings == newProfile.settings)
+        }
+        print("PASS: all nine new effects retain color, speed, selected keys and layer order in Mac profiles")
         invalid = layered; invalid.layers = []
-        try rejectsFile(invalid, at: url, label: "empty layer stack")
+        try invalid.save(to:url)
+        let emptyReload = try LightingProfile.load(from:url)
+        assert(emptyReload?.studioLayers.isEmpty == true)
+        print("PASS: empty layer stacks save and reload without adding a default effect")
         invalid = layered; invalid.layers = [top, top]
         try rejectsFile(invalid, at: url, label: "duplicate layer identifiers")
         invalid = layered; invalid.layers![0].opacity = 1.1

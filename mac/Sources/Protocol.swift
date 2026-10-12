@@ -8,6 +8,18 @@ struct RGB: Equatable, Codable {
 struct RGBState: Equatable {
     let index: Int; let color: RGB; let effect: Int; let brightness: Int; let checksum: UInt16
 }
+struct KeyboardSleepState: Equatable {
+    let seconds: Int // zero means Never
+    static let signature: [UInt8] = [8, 3, 6, 1, 71, 77, 75, 83]
+    static func parse(_ p: [UInt8]) throws -> Self? {
+        try require(p.count == 32, "Invalid sleep-setting response length.")
+        guard Array(p.prefix(8)) == signature else { return nil }
+        try require(Array(p[10..<16]) == [3,3,16,14,60,0], "Unrecognized keyboard sleep capabilities.")
+        let seconds = Int(p[8]) | Int(p[9]) << 8
+        try require(seconds == 0 || (60...3600).contains(seconds), "The keyboard returned an invalid sleep time.")
+        return Self(seconds: seconds)
+    }
+}
 enum ControllerError: LocalizedError {
     case message(String)
     var errorDescription: String? { if case .message(let message) = self { return message }; return nil }
@@ -23,15 +35,36 @@ func require(_ condition: Bool, _ message: String) throws {
     if !condition { throw ControllerError.message(message) }
 }
 protocol ReportTransport: AnyObject {
+    var connectionName: String { get }
+    var reconnectsWithoutReplug: Bool { get }
+    var usesRollingAnimationVerification: Bool { get }
     func exchange(_ payload: [UInt8]) throws -> [UInt8]
+    func writeFrame(_ frame: [RGB]) throws
     func checkSingleDevice() throws
     func close()
+}
+extension ReportTransport {
+    var connectionName: String { "USB" }
+    var reconnectsWithoutReplug: Bool { false }
+    var usesRollingAnimationVerification: Bool { false }
+    func writeFrame(_ frame: [RGB]) throws {
+        try require(frame.count == 104, "A frame requires 104 colors.")
+        for start in stride(from: 0, to: 104, by: 9) {
+            let colors = Array(frame[start..<min(start + 9, 104)])
+            _ = try exchange([7, 3, 5, UInt8(start), UInt8(colors.count)] + colors.flatMap(\.bytes))
+        }
+    }
+}
+struct TransportUnavailableError: LocalizedError {
+    let message: String
+    var errorDescription: String? { message }
 }
 final class RGBClient {
     let transport: ReportTransport
     private(set) var shadow: [RGB]?
     private(set) var indicatorOverrides = Set<Int>()
     private var animationSequence = 0
+    private var hasAnimationBaseline = false
     init(_ transport: ReportTransport) { self.transport = transport }
     static let signature: [UInt8] = [8, 3, 5, 2, 104, 9, 15, 71, 77, 75, 2]
     // The exact v0.2 firmware retains the stock status-light tail. It can force
@@ -48,15 +81,26 @@ final class RGBClient {
         try require(p.count == 32, "Invalid HID response length; reconnect the keyboard.")
         try require(Array(p.prefix(11)) == signature, "Exact custom firmware v0.2 signature not found. Lighting controls are locked.")
         try require(Int(p[11]) == index, "The keyboard returned the wrong LED index.")
-        try require(p[15] <= 19 && p[16] <= 4, "The keyboard returned invalid effect or brightness values.")
+        try require(p[15] <= 20 && p[16] <= 4, "The keyboard returned invalid effect or brightness values.")
         return RGBState(index: index, color: RGB(r: p[12], g: p[13], b: p[14]), effect: Int(p[15]), brightness: Int(p[16]), checksum: UInt16(p[17]) | UInt16(p[18]) << 8)
     }
     func read(_ index: Int = 0) throws -> RGBState {
         try require((0..<104).contains(index), "LED index must be 0–103.")
         return try Self.parse(transport.exchange([8, 3, 5, UInt8(index)]), index: index)
     }
+    func readSleepSettings() throws -> KeyboardSleepState? {
+        try KeyboardSleepState.parse(transport.exchange([8,3,6,1]))
+    }
+    func setSleepTime(_ seconds: Int) throws {
+        try require(seconds == 0 || (60...3600).contains(seconds), "Sleep time must be 1–60 minutes or Never.")
+        _ = try gate()
+        try require(try readSleepSettings() != nil, "Adjustable sleep requires custom firmware v0.3.")
+        _ = try transport.exchange([7,3,6,1,UInt8(seconds & 255),UInt8(seconds >> 8)])
+        try require(try readSleepSettings()?.seconds == seconds, "The keyboard did not accept the sleep time.")
+    }
     func readFrame(expected: [RGB]? = nil) throws -> [RGB] {
         shadow = nil
+        hasAnimationBaseline = false
         let first = try read()
         try verifyLighting(first.effect == 19, "A stable direct RGB frame is required.")
         var frame = [first.color]
@@ -78,6 +122,7 @@ final class RGBClient {
             indicatorOverrides = overrides
         }
         shadow = frame
+        hasAnimationBaseline = true
         return frame
     }
     private func gate(visible: Bool = false) throws -> RGBState {
@@ -88,10 +133,7 @@ final class RGBClient {
     }
     private func sendFramePackets(_ frame: [RGB]) throws {
         shadow = nil
-        for start in stride(from: 0, to: 104, by: 9) {
-            let colors = Array(frame[start..<min(start + 9, 104)])
-            _ = try transport.exchange([7, 3, 5, UInt8(start), UInt8(colors.count)] + colors.flatMap(\.bytes))
-        }
+        try transport.writeFrame(frame)
     }
     private func sendFrame(_ frame: [RGB]) throws {
         try sendFramePackets(frame)
@@ -102,9 +144,40 @@ final class RGBClient {
     func setAnimationFrame(_ frame: [RGB], fullVerification: Bool = false) throws -> RGBState {
         try require(frame.count == 104, "An animation frame requires exactly 104 colors.")
         let before = try gate(visible: true)
+        let baselineVerified = hasAnimationBaseline
+        hasAnimationBaseline = false
         try sendFramePackets(frame)
-        if fullVerification || animationSequence % 30 == 0 || before.effect != 19 {
+        if fullVerification || !baselineVerified || before.effect != 19 || (!transport.usesRollingAnimationVerification && animationSequence % 30 == 0) {
             _ = try readFrame(expected: frame)
+        } else if transport.usesRollingAnimationVerification {
+            // On Bluetooth, 104 synchronous ATT reads freeze a short ripple.
+            // Check the whole-frame checksum on every frame and visit every
+            // LED in 52 frames. Startup and explicit edits retain full readback.
+            let first = try read()
+            var verifiedFrame = frame
+            var overrides = Set<Int>()
+            if first.checksum != Self.sum(frame) {
+                for i in Self.indicatorIndices.sorted() {
+                    let sample = try read(i)
+                    try verifyLighting(sample.effect == 19 && sample.brightness == before.brightness && sample.checksum == first.checksum,
+                                       "Animation changed during status-light verification.")
+                    if Self.isIndicatorOverride(index: i, actual: sample.color, expected: frame[i]) {
+                        verifiedFrame[i] = sample.color; overrides.insert(i)
+                    } else {
+                        try verifyLighting(sample.color == frame[i], "Animation status light did not match.")
+                    }
+                }
+            }
+            try verifyLighting(first.effect == 19 && first.brightness == before.brightness && first.color == frame[0] && first.checksum == Self.sum(verifiedFrame),
+                               "Animation checksum did not match. Playback stopped.")
+            let index = animationSequence % 52
+            for i in [index, index + 52] {
+                let sample = try read(i)
+                try verifyLighting(sample.effect == 19 && sample.brightness == before.brightness &&
+                                   sample.checksum == first.checksum && sample.color == verifiedFrame[i],
+                                   "Animation LED \(i) did not match. Playback stopped.")
+            }
+            indicatorOverrides = overrides
         } else {
             let index = animationSequence % 104
             let indices = Self.indicatorIndices.union([index, (index + 52) % 104]).sorted()
@@ -132,6 +205,7 @@ final class RGBClient {
         try verifyLighting(final.effect == 19 && final.brightness == before.brightness &&
                     final.color == frame[0] && final.checksum == Self.sum(verifiedFrame),
                     "Animation frame changed before completion. Playback stopped.")
+        hasAnimationBaseline = true
         return final
     }
     func setFrame(_ frame: [RGB]) throws {
@@ -164,7 +238,7 @@ final class RGBClient {
         try require(try read().brightness == value, "Brightness readback did not match.")
     }
     func effect(_ value: Int) throws {
-        try require((0...18).contains(value), "Built-in effect must be 0–18.")
+        try require((0...18).contains(value) || value == 20, "Built-in effect must be 0–18 or on-keyboard ripple (20).")
         _ = try gate()
         _ = try transport.exchange([7, 3, 2, UInt8(value)])
         try require(try read().effect == value, "Effect readback did not match.")

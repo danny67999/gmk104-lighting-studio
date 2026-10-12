@@ -3,7 +3,7 @@ import IOKit
 import IOKit.hid
 import IOKit.hidsystem
 
-/// Observes physical key-down transitions only, from the connected GMK104.
+/// Observes physical key-down and key-up transitions from the connected GMK104.
 /// Does not seize the keyboard, interpret text, retain a typing history, or post events.
 final class KeyboardEvents {
     enum Permission: String {
@@ -36,11 +36,11 @@ final class KeyboardEvents {
         var errorDescription: String? { switch self { case .message(let message): return message } }
     }
 
-    private let onPress: (String) -> Void
+    private let onKeyChange: (String, Bool) -> Void
     private let lock = NSLock()
     private var session: Session?
 
-    init(onPress: @escaping (String) -> Void) { self.onPress = onPress }
+    init(onKeyChange: @escaping (String, Bool) -> Void) { self.onKeyChange = onKeyChange }
 
     /// The registry ID must be the current vendor HID interface (FF60:0061).
     /// Its USB ancestor ties all input interfaces to this exact physical attachment.
@@ -48,16 +48,20 @@ final class KeyboardEvents {
         stop()
         let access = Self.permission
         guard access == .granted else { throw MonitorError.message(access.message) }
-        guard let registryID, let target = Self.usbAncestor(registryID: registryID) else {
-            throw MonitorError.message("Connect the wired GMK104 before enabling keypress effects.")
+        guard let registryID else {
+            throw MonitorError.message("Connect the GMK104 before enabling keypress effects.")
         }
-        let next = Session(usbID: target) { [weak self] source, key in
+        let usb = Self.usbAncestor(registryID: registryID)
+        guard usb != nil || BluetoothKeyboardIdentity.candidates().contains(where: { $0.registryID == registryID }) else {
+            throw MonitorError.message("The connected keyboard's input identity could not be verified.")
+        }
+        let next = Session(usbID: usb, bluetoothID: usb == nil ? registryID : nil) { [weak self] source, key, down in
             DispatchQueue.main.async { [weak self, weak source] in
                 guard let self, let source else { return }
                 self.lock.lock()
                 let isCurrent = self.session === source
                 self.lock.unlock()
-                if isCurrent && source.isActive { self.onPress(key) }
+                if isCurrent && source.isActive { self.onKeyChange(key, down) }
             }
         }
         lock.lock(); session = next; lock.unlock()
@@ -133,8 +137,9 @@ final class KeyboardEvents {
     /// HID scheduling is isolated from the serial vendor-report exchange run loop.
     /// The thread retains this session until every callback is unregistered and device closed.
     private final class Session {
-        let usbID: UInt64
-        let onPress: (Session, String) -> Void
+        let usbID: UInt64?
+        let bluetoothID: UInt64?
+        let onKeyChange: (Session, String, Bool) -> Void
         private let stateLock = NSLock()
         private let ready = DispatchSemaphore(value: 0)
         private var runLoop: CFRunLoop?
@@ -144,8 +149,8 @@ final class KeyboardEvents {
         private var devices: [IOHIDDevice] = []
         private var pressedByDevice: [UInt64: Set<UInt32>] = [:]
 
-        init(usbID: UInt64, onPress: @escaping (Session, String) -> Void) {
-            self.usbID = usbID; self.onPress = onPress
+        init(usbID: UInt64?, bluetoothID: UInt64?, onKeyChange: @escaping (Session, String, Bool) -> Void) {
+            self.usbID = usbID; self.bluetoothID = bluetoothID; self.onKeyChange = onKeyChange
         }
 
         var isActive: Bool {
@@ -183,18 +188,21 @@ final class KeyboardEvents {
             do {
                 guard isActive else { throw MonitorError.message("Key input stopped.") }
                 let manager = IOHIDManagerCreate(kCFAllocatorDefault, IOHIDManagerOptions.independentDevices.rawValue)
-                IOHIDManagerSetDeviceMatching(manager, [
-                    kIOHIDVendorIDKey: 0x320F, kIOHIDProductIDKey: 0x5055,
+                IOHIDManagerSetDeviceMatching(manager, (bluetoothID != nil ? BluetoothKeyboardIdentity.matching : [
+                    kIOHIDVendorIDKey: 0x320F,
                     kIOHIDDeviceUsagePageKey: 1, kIOHIDDeviceUsageKey: 6
-                ] as CFDictionary)
+                ]) as CFDictionary)
                 // Enumeration alone does not open or subscribe to any device.
                 let candidates = (IOHIDManagerCopyDevices(manager) as? Set<IOHIDDevice>) ?? []
                 let selected = candidates.filter {
                     guard let id = KeyboardEvents.registryID(of: $0) else { return false }
-                    return KeyboardEvents.usbAncestor(registryID: id) == usbID
+                    // This ID was verified by BluetoothKeyboardIdentity, which
+                    // accepts both macOS spellings of the BLE transport name.
+                    if let bluetoothID { return id == bluetoothID }
+                    return usbID != nil && KeyboardEvents.usbAncestor(registryID: id) == usbID
                 }
                 guard !selected.isEmpty else {
-                    throw MonitorError.message("No keyboard input interface was found for this GMK104 USB connection.")
+                    throw MonitorError.message("No keyboard input interface was found for this GMK104 connection.")
                 }
                 // Check before every open: IOHIDDeviceOpen can otherwise prompt automatically.
                 for device in selected {
@@ -217,7 +225,7 @@ final class KeyboardEvents {
                         guard let context, let sender else { return }
                         let owner = Unmanaged<Session>.fromOpaque(context).takeUnretainedValue()
                         let device = Unmanaged<IOHIDDevice>.fromOpaque(sender).takeUnretainedValue()
-                        if let id = KeyboardEvents.registryID(of: device) { owner.pressedByDevice.removeValue(forKey: id) }
+                        if let id = KeyboardEvents.registryID(of: device) { owner.removedDevice(id) }
                     }, context)
                     IOHIDDeviceScheduleWithRunLoop(device, loop, CFRunLoopMode.defaultMode.rawValue)
                 }
@@ -249,9 +257,19 @@ final class KeyboardEvents {
             let wasDown = pressedByDevice.values.contains { $0.contains(usage) }
             if IOHIDValueGetIntegerValue(value) != 0 {
                 pressedByDevice[id, default: []].insert(usage)
-                if !wasDown { onPress(self, key) }
+                if !wasDown { onKeyChange(self, key, true) }
             } else {
                 pressedByDevice[id]?.remove(usage)
+                if wasDown && !pressedByDevice.values.contains(where: { $0.contains(usage) }) {
+                    onKeyChange(self, key, false)
+                }
+            }
+        }
+
+        private func removedDevice(_ id: UInt64) {
+            let released = pressedByDevice.removeValue(forKey: id) ?? []
+            for usage in released where !pressedByDevice.values.contains(where: { $0.contains(usage) }) {
+                if let key = KeyboardEvents.keyID(forUsage: usage) { onKeyChange(self, key, false) }
             }
         }
     }

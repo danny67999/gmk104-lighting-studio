@@ -9,7 +9,8 @@ xcrun swiftc -swift-version 5 -O -parse-as-library -target arm64-apple-macosx13.
   mac/Sources/*.swift -o "$APP/Contents/MacOS/GMK104RGBController"
 cp mac/Resources/*.json "$APP/Contents/Resources/"
 cp mac/Resources/AppIcon.icns "$APP/Contents/Resources/"
-cp LICENSE THIRD_PARTY_NOTICES.md "$APP/Contents/Resources/"
+mkdir -p "$APP/Contents/Resources/Profiles"
+cp mac/Resources/Profiles/*.json "$APP/Contents/Resources/Profiles/"
 cat > "$APP/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -19,11 +20,13 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 <key>CFBundleExecutable</key><string>GMK104RGBController</string>
 <key>CFBundleIconFile</key><string>AppIcon</string>
 <key>CFBundlePackageType</key><string>APPL</string>
-<key>CFBundleShortVersionString</key><string>1.4.1</string>
-<key>CFBundleVersion</key><string>11</string>
+<key>CFBundleShortVersionString</key><string>1.0</string>
+<key>CFBundleVersion</key><string>36</string>
 <key>LSMinimumSystemVersion</key><string>13.0</string>
 <key>NSAudioCaptureUsageDescription</key><string>React keyboard lighting to audio playing on your Mac. Audio is analyzed locally and is never recorded or uploaded.</string>
+<key>NSBluetoothAlwaysUsageDescription</key><string>Control lighting on your paired GMK104 keyboard over Bluetooth.</string>
 <key>NSHighResolutionCapable</key><true/>
+<key>NSRequiresAquaSystemAppearance</key><false/>
 </dict></plist>
 PLIST
 codesign --force --sign - "$APP"

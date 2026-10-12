@@ -1,7 +1,7 @@
 [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'High')]
 param(
     [ValidateSet('Inspect', 'DryRun', 'TestConnection', 'Flash')][string]$Mode = 'Inspect',
-    [ValidateSet('Custom', 'Wireless', 'Streaming', 'Stock')][string]$Target = 'Custom',
+    [ValidateSet('Release','Custom','Wireless','Streaming','Stock')][string]$Target = 'Release',
     [string]$Confirmation
 )
 
@@ -17,6 +17,16 @@ $RetiredCustomCrc = [uint32]0xC077F2F5L
 $ExpectedStockCrc = [uint32]0xB85531A2L
 $ExpectedWirelessCrc = [uint32]0x060C4E9EL
 $ExpectedStreamingCrc = [uint32]0x6F0AD0C1L
+$ExpectedReleaseCrc = [uint32]0x7F2F4310L
+$ExpectedMatrixColumnsCrc = [uint32]0x193BCBFAL
+$ExpectedMatrixVerticalCrc = [uint32]0xD725D89AL
+$ExpectedMatrixStaggeredCrc = [uint32]0xA86B6815L
+$ExpectedMatrixFixedCrc = [uint32]0xB27DBFBEL
+$ExpectedMatrixCrc = [uint32]0x9066E8DBL
+$ExpectedReactiveCrc = [uint32]0x37E8F32BL
+$ExpectedPerformanceCrc = [uint32]0x938EFC28L
+$ExpectedPersistentCrc = [uint32]0xD51110C3L
+$ExpectedPreviousCrc = [uint32]0xB6EA62D8L
 $ExpectedCustomStreamHash = '1565181114783AB9ED0E12EE4A5CC1366DD1412A1F36FEE7628926140377C0A7'
 $ExpectedStockStreamHash = '818CF184FCE29532363DF592AAE2ADAAAB0AFEA345D99667240E5BA96302950A'
 $ExpectedCustomPaddedHash = 'C68E839209350A16D4802533C204E49DF3201E5F59F6BB74FC1602BB2D5FCB91'
@@ -28,22 +38,25 @@ $ReportId = [byte]5
 
 # Exact image and independently verified OTA stream identities from the Mac project.
 $FirmwareTargets = @{
+    Release = @{ File='GMK104-firmware-1.0.bin'; Hash='4BDC3E9729A0583F2DAEA150FA1CCF4374C5115046F3B8F0655A4758B1DFE22E'; Crc=$ExpectedReleaseCrc; Length=174372;
+        Stream='CCD0EC6A43F3EBBF2FF84AA1A95F79DB300D8076ED1C5853E9345B51A1F3689E'; Padded='B72D6B4BD9C3D70683548B0FF094560218697787862895AAB5DB22FA9650F232';
+        Sources=@($ExpectedStockCrc,$ExpectedCustomCrc,$ExpectedWirelessCrc,$ExpectedStreamingCrc,$ExpectedPersistentCrc,$ExpectedPerformanceCrc,$ExpectedReactiveCrc,$ExpectedMatrixCrc,$ExpectedMatrixFixedCrc,$ExpectedMatrixStaggeredCrc,$ExpectedMatrixVerticalCrc,$ExpectedMatrixColumnsCrc); Phrase='INSTALL GMK104 LIGHTING 7F2F4310' }
     Custom = @{ File=$CustomFileName; Hash=$ExpectedCustomHash; Crc=$ExpectedCustomCrc; Length=140244;
         Stream=$ExpectedCustomStreamHash; Padded=$ExpectedCustomPaddedHash;
-        Sources=@($ExpectedStockCrc,$ExpectedWirelessCrc,$ExpectedStreamingCrc); Phrase='FLASH GMK104 CUSTOM C6342859' }
+        Sources=@($ExpectedReleaseCrc,$ExpectedStockCrc,$ExpectedWirelessCrc,$ExpectedStreamingCrc); Phrase='FLASH GMK104 CUSTOM C6342859' }
     Wireless = @{ File='GMK104-custom-RGB-v0.3-experimental.bin'; Hash='CFB5604E1B861948078C0176801A74EF45727C96225145DA82B25FB81B96DD8A'; Crc=$ExpectedWirelessCrc; Length=142820;
         Stream='D2847D4B445AA3D71DEA6F9479B77ADD70DAFC10BF570704D9793B91E89A9D77'; Padded='439608D8FE9AD55280972047820EC7CD2BB586BEA4F1CB654BB54A3A11B47A1F';
-        Sources=@($ExpectedCustomCrc,$ExpectedStreamingCrc); Phrase='TEST GMK104 WIRELESS 060C4E9E' }
+        Sources=@($ExpectedReleaseCrc,$ExpectedCustomCrc,$ExpectedStreamingCrc); Phrase='TEST GMK104 WIRELESS 060C4E9E' }
     Streaming = @{ File='GMK104-custom-RGB-v0.4-experimental.bin'; Hash='11DB2CD854381021B45C0B025D7FABC5277CDBFED185A4E8AF0E9327D7ACC347'; Crc=$ExpectedStreamingCrc; Length=142820;
         Stream='87005D5D7E249C731B135923A447DA28A30514DD7FDB3BB1546C3471132E2C57'; Padded='1610D752A299D26CEFE6A744FAE900AC3C1EB877210217A808238526542F8976';
-        Sources=@($ExpectedWirelessCrc); Phrase='TEST GMK104 BLUETOOTH 6F0AD0C1' }
+        Sources=@($ExpectedReleaseCrc,$ExpectedWirelessCrc); Phrase='TEST GMK104 BLUETOOTH 6F0AD0C1' }
     Stock = @{ File=$StockFileName; Hash=$ExpectedStockHash; Crc=$ExpectedStockCrc; Length=140244;
         Stream=$ExpectedStockStreamHash; Padded=$ExpectedStockPaddedHash;
-        Sources=@($ExpectedCustomCrc,$ExpectedWirelessCrc,$ExpectedStreamingCrc,$RetiredCustomCrc); Phrase='RESTORE GMK104 STOCK B85531A2' }
+        Sources=@($ExpectedReleaseCrc,$ExpectedMatrixColumnsCrc,$ExpectedMatrixVerticalCrc,$ExpectedMatrixStaggeredCrc,$ExpectedMatrixFixedCrc,$ExpectedCustomCrc,$ExpectedWirelessCrc,$ExpectedStreamingCrc,$RetiredCustomCrc,$ExpectedPersistentCrc,$ExpectedPreviousCrc,$ExpectedPerformanceCrc,$ExpectedReactiveCrc,$ExpectedMatrixCrc); Phrase='RESTORE GMK104 STOCK B85531A2' }
 }
 
 function Test-ApprovedTransition {
-    param([uint32]$Source,[ValidateSet('Custom','Wireless','Streaming','Stock')][string]$ImageTarget)
+    param([uint32]$Source,[ValidateSet('Release','Custom','Wireless','Streaming','Stock')][string]$ImageTarget)
     return $Source -in $FirmwareTargets[$ImageTarget].Sources
 }
 
@@ -182,7 +195,7 @@ public static class Gmk104WindowsFirmwareHid {
         SafeFileHandle handle; FileStream stream; int inputLength, outputLength;
         readonly Stopwatch pacing=Stopwatch.StartNew(); long earliest; int afterReply; bool faulted;
         public Session(string path,int input,int output,bool exclusive) {
-            afterReply=exclusive?40:0;
+            afterReply=exclusive?24:0;
             inputLength=input; outputLength=output; handle=Open(path,exclusive);
             if(handle.IsInvalid) { int e=Marshal.GetLastWin32Error(); handle.Dispose();
                 throw new Win32Exception(e, exclusive ?
@@ -261,7 +274,7 @@ function Assert-ImageBytes {
 }
 
 function Read-ApprovedFirmware {
-    param([ValidateSet('Custom','Wireless','Streaming','Stock')][string]$ImageTarget)
+    param([ValidateSet('Release','Custom','Wireless','Streaming','Stock')][string]$ImageTarget)
     $definition=$FirmwareTargets[$ImageTarget]
     $name=$definition.File
     $wantedHash=$definition.Hash
@@ -444,7 +457,7 @@ function Get-Gmk104State {
     if($v.Caps.InputReportByteLength-ne 33-or$v.Caps.OutputReportByteLength-ne 33-or$v.Caps.FeatureReportByteLength-ne 0){throw 'Unexpected VIA HID report shape.'}
     $version=Get-VerifiedVersionFromDevice $o
     if($version.Version-ne 0){throw ('Unexpected firmware version field 0x{0:X8}.' -f $version.Version)}
-    if($version.Crc-notin@($ExpectedStockCrc,$ExpectedCustomCrc,$ExpectedWirelessCrc,$ExpectedStreamingCrc,$RetiredCustomCrc)){throw ('Unapproved installed CRC 0x{0:X8}.' -f $version.Crc)}
+    if($version.Crc-notin@($ExpectedReleaseCrc,$ExpectedMatrixColumnsCrc,$ExpectedMatrixVerticalCrc,$ExpectedMatrixStaggeredCrc,$ExpectedMatrixFixedCrc,$ExpectedStockCrc,$ExpectedCustomCrc,$ExpectedWirelessCrc,$ExpectedStreamingCrc,$RetiredCustomCrc,$ExpectedPersistentCrc,$ExpectedPreviousCrc,$ExpectedPerformanceCrc,$ExpectedReactiveCrc,$ExpectedMatrixCrc)){throw ('Unapproved installed CRC 0x{0:X8}.' -f $version.Crc)}
     Assert-NormalViaResponse $v
     return [pscustomobject]@{Device=$o;ViaDevice=$v;Version=$version.Version;Crc=$version.Crc;ContainerId=$o.ContainerId}
 }
@@ -457,6 +470,58 @@ function Assert-WirelessSleepSignature {
     Assert-ImageBytes $r 11 ([byte[]](3,3,16,14,60,0)) 'Sleep capability bytes'
     $seconds=[int]$r[9]+([int]$r[10]-shl 8)
     if($seconds-ne 0-and($seconds-lt 60-or$seconds-gt 3600)){throw 'Invalid sleep setting.'}
+}
+
+function Test-StorageReservation {
+    param([byte[]]$Bytes)
+    if($Bytes.Length-ne 4096){return $false}
+    [byte[]]$reservation=[Text.Encoding]::ASCII.GetBytes('GMK104-PROFILE-1')+[byte[]](0,0xC0,8,0,0,0xD0,8,0,0x85,0x60,0x14,0,0x47,0x4D,0x4B,0x4F)
+    $blank=$true;$complete=$true;$partial=$true
+    for($i=0;$i-lt 4096;$i++){
+        if($Bytes[$i]-ne 255){$blank=$false}
+        if($i-ge 3968-and$i-lt 4000){$n=$i-3968;if($Bytes[$i]-ne$reservation[$n]){$complete=$false};if(($Bytes[$i]-band$reservation[$n])-ne$reservation[$n]){$partial=$false}}
+        elseif($Bytes[$i]-ne 255){$partial=$false}
+    }
+    return $blank-or$complete-or$partial
+}
+
+function Read-StorageDiagnostic {
+    param([object]$Session,[byte]$Slot,[int]$Offset,[int]$Count)
+    if($Slot-gt 2-or$Offset-lt 0-or$Offset-ge 4096-or$Count-lt 0-or$Count-gt 18-or($Offset+$Count)-gt 4096){throw 'Invalid bounded storage read.'}
+    [byte[]]$request=New-Object byte[] 33
+    [byte[]]$prefix=8,3,7,6,$Slot,($Offset-band 255),(($Offset-shr 8)-band 255),$Count
+    [Array]::Copy($prefix,0,$request,1,8)
+    [byte[]]$full=$Session.Exchange($request,3000,$true)
+    if($full.Length-ne 33-or$full[0]-ne 0){throw 'Storage diagnostic report shape differs.'}
+    [byte[]]$reply=$full[1..32]
+    Assert-Prefix $reply ([byte[]](8,3,7,6,71,77,75,68,1,0)) 'Read-only storage diagnostic'
+    if($reply[10]-ne$Slot-or$reply[11]-ne($Offset-band 255)-or$reply[12]-ne(($Offset-shr 8)-band 255)-or$reply[13]-ne$Count){throw 'Storage reply did not match its exact request.'}
+    return ,$reply
+}
+
+function Test-PersistentStoragePrecheck {
+    param([object]$State)
+    if($State.Crc-ne$ExpectedPreviousCrc){throw 'Persistent firmware precheck requires exact verified v0.8.'}
+    $reader=[Gmk104WindowsFirmwareHid+Session]::new($State.ViaDevice.Path,33,33,$false)
+    try {
+        [byte[]]$info=Read-StorageDiagnostic $reader 0 0 0
+        if([BitConverter]::ToUInt32($info,14)-ne[uint32]0x00146085-or$info[18]-ne 0x14){throw 'The surveyed flash chip identity changed. No OTA START was sent.'}
+        Assert-ImageBytes $info 19 ([byte[]](0,0xC0,8,0,0xD0,8,0,0,0,0,0,0,0)) 'Flash allocation metadata'
+        foreach($slot in @(1,2)) {
+            [byte[]]$sector=New-Object byte[] 4096
+            for($offset=0;$offset-lt 4096;$offset+=18) {
+                $count=[Math]::Min(18,4096-$offset)
+                [byte[]]$reply=Read-StorageDiagnostic $reader ([byte]$slot) $offset $count
+                for($i=14+$count;$i-lt 32;$i++){if($reply[$i]-ne 0){throw 'Unexpected storage reply tail.'}}
+                [Array]::Copy($reply,14,$sector,$offset,$count)
+                if(($offset%288)-eq 0){Write-Progress -Activity 'Read-only persistent storage precheck' -PercentComplete ((($slot-1)*4096+$offset)*100/8192)}
+            }
+            if(-not(Test-StorageReservation $sector)){throw "Proposed storage slot $slot contains unrecognized data. No firmware or permanent storage was written."}
+        }
+    } finally {$reader.Dispose();Write-Progress -Activity 'Read-only persistent storage precheck' -Completed}
+    $after=Get-Gmk104State
+    if($after.Crc-ne$State.Crc-or$after.ContainerId-ne$State.ContainerId-or$after.Device.Path-cne$State.Device.Path-or$after.ViaDevice.Path-cne$State.ViaDevice.Path){throw 'Keyboard attachment changed during the read-only storage precheck.'}
+    Write-Output 'READ-ONLY STORAGE PRECHECK PASS: exact 1 MB chip; both slots blank or recognized reservations. Allocation is reverse engineered.'
 }
 
 function Test-SustainedConnection {
@@ -533,9 +598,9 @@ try {
     Write-Output ('  Product={0}; manufacturer={1}; USB version=0x{2:X4}' -f $state.Device.Product,$state.Device.Manufacturer,$state.Device.Attributes.VersionNumber)
     Write-Output ('  Physical container={0}' -f $state.ContainerId)
     Write-Output ('  Installed version=0x{0:X8}, CRC=0x{1:X8}' -f $state.Version,$state.Crc)
-    if($state.Crc-in@($ExpectedCustomCrc,$ExpectedWirelessCrc,$ExpectedStreamingCrc)){Assert-CustomViaSignature $state.ViaDevice 2;Write-Output '  Compatible custom RGB signature: PASS'}
+    if($state.Crc-in@($ExpectedReleaseCrc,$ExpectedMatrixColumnsCrc,$ExpectedMatrixVerticalCrc,$ExpectedMatrixStaggeredCrc,$ExpectedMatrixFixedCrc,$ExpectedCustomCrc,$ExpectedWirelessCrc,$ExpectedStreamingCrc,$ExpectedPersistentCrc,$ExpectedPreviousCrc,$ExpectedPerformanceCrc,$ExpectedReactiveCrc,$ExpectedMatrixCrc)){Assert-CustomViaSignature $state.ViaDevice 2;Write-Output '  Compatible custom RGB signature: PASS'}
     elseif($state.Crc-eq$RetiredCustomCrc){Assert-CustomViaSignature $state.ViaDevice 1;Write-Warning 'Retired custom v0.1 is installed; only stock rollback is permitted.'}
-    if($state.Crc-in@($ExpectedWirelessCrc,$ExpectedStreamingCrc)){Assert-WirelessSleepSignature $state.ViaDevice}
+    if($state.Crc-in@($ExpectedReleaseCrc,$ExpectedMatrixColumnsCrc,$ExpectedMatrixVerticalCrc,$ExpectedMatrixStaggeredCrc,$ExpectedMatrixFixedCrc,$ExpectedWirelessCrc,$ExpectedStreamingCrc,$ExpectedPersistentCrc,$ExpectedPreviousCrc,$ExpectedPerformanceCrc,$ExpectedReactiveCrc,$ExpectedMatrixCrc)){Assert-WirelessSleepSignature $state.ViaDevice}
     if($Mode-eq'Inspect'){
         Write-Output 'READ-ONLY INSPECTION COMPLETE. Only passive version and VIA queries were sent; OTA START was not sent.'
         return
@@ -556,6 +621,7 @@ try {
     }
 
     Test-SustainedConnection $state
+    if($Target-eq'Persistent'-and$state.Crc-eq$ExpectedPreviousCrc){Test-PersistentStoragePrecheck $state}
     $armed=Get-Gmk104State
     if($armed.Crc-ne$sourceCrc-or$armed.ContainerId-ne$state.ContainerId-or$armed.Device.Path-cne$state.Device.Path-or$armed.ViaDevice.Path-cne$state.ViaDevice.Path){
         throw 'Keyboard identity or firmware changed after confirmation. OTA START was not sent.'
@@ -578,12 +644,12 @@ try {
         Write-Output "  Durable flash log: $logPath"
 
         Write-FlashLog $logWriter 'START SEND';$transferStarted=$true;$script:FlashLogRequired=$false
-        $ack=$session.Exchange($plan.Start,5000,$true);Test-OtaIntermediateAck $ack 'OTA START';Write-FlashLog $logWriter 'START ACK'
+        $ack=$session.Exchange($plan.Start,60000,$true);Test-OtaIntermediateAck $ack 'OTA START';Write-FlashLog $logWriter 'START ACK'
         for($i=0;$i-lt$plan.DataReports.Count;$i++){
             if($deadline.Elapsed.TotalMinutes-ge$FlashDeadlineMinutes){throw "Overall $FlashDeadlineMinutes-minute flash deadline exceeded."}
             $first=$i*3;$last=[Math]::Min($first+2,$plan.ChunkCount-1)
             Write-FlashLog $logWriter ('DATA SEND report={0}/{1} chunks={2}-{3}' -f ($i+1),$plan.DataReports.Count,$first,$last)
-            $ack=$session.Exchange($plan.DataReports[$i],10000,$true);Test-OtaIntermediateAck $ack ("Data report $($i+1)")
+            $ack=$session.Exchange($plan.DataReports[$i],60000,$true);Test-OtaIntermediateAck $ack ("Data report $($i+1)")
             Write-FlashLog $logWriter ('DATA ACK report={0}/{1}' -f ($i+1),$plan.DataReports.Count)
             if((($i+1)%50)-eq 0-or($i+1)-eq$plan.DataReports.Count){
                 $pct=[int](100*($i+1)/$plan.DataReports.Count);Write-Progress -Activity "Flashing GMK104 $Target" -Status "$pct%" -PercentComplete $pct
@@ -592,7 +658,7 @@ try {
         }
         if($deadline.Elapsed.TotalMinutes-ge$FlashDeadlineMinutes){throw 'Flash deadline exceeded before OTA END.'}
         Write-FlashLog $logWriter 'END SEND'
-        try{$finalResponse=$session.Exchange($plan.End,10000,$true);Write-FlashLog $logWriter 'END RESPONSE RECEIVED'}
+        try{$finalResponse=$session.Exchange($plan.End,60000,$true);Write-FlashLog $logWriter 'END RESPONSE RECEIVED'}
         catch{$endError=$_.Exception.Message;Write-FlashLog $logWriter "END RESPONSE ERROR: $endError"}
     }
     catch {
@@ -620,7 +686,7 @@ try {
             if($after.ContainerId-ne$state.ContainerId-or$after.Device.Path-cne$state.Device.Path-or$after.ViaDevice.Path-cne$state.ViaDevice.Path){throw 'Post-reboot keyboard attachment did not match the confirmed USB port.'}
             if($after.Crc-eq$image.Crc){
                 if($Target-ne'Stock'){Assert-CustomViaSignature $after.ViaDevice 2}
-                if($Target-in@('Wireless','Streaming')){Assert-WirelessSleepSignature $after.ViaDevice}
+                if($Target-in@('Release','Wireless','Streaming','MatrixColumns','MatrixVertical','MatrixStaggered','MatrixFixed','Matrix','Reactive','Performance','Persistent','Previous')){Assert-WirelessSleepSignature $after.ViaDevice}
                 $verified=$true;Write-FlashLog $logWriter ("POSTBOOT VERIFIED attempt=$attempt");break
             }
             $lastError=('Saw CRC 0x{0:X8}.' -f $after.Crc)

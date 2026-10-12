@@ -1,133 +1,53 @@
-# GMK104 Lighting Studio — Per-key RGB for Windows and macOS
+# GMK104 Lighting Studio 1.0 — per-key RGB for Windows and macOS
 
-**Add per-key RGB to the ZUOYA GMK104 on Windows and macOS.** Lighting Studio works with compatible custom firmware to give each of the 104 keys its own RGB color. Highlight WASD, color individual keys or key groups, and combine layered ripple, reactive, music-responsive and other lighting effects.
+Give every key on the ZUOYA GMK104 its own color, combine up to **16 lighting layers**, and save the effects to the keyboard so they run without the app and return after unplugging it. Compatible custom firmware is required; installing the desktop app alone does not add per-key RGB to stock firmware.
 
-**Compatible custom firmware is required:** installing the desktop app alone does not enable per-key RGB on stock firmware. Each platform has its own lighting app and separate firmware tool; see the platform guides for connection support and tested behavior.
+## Download 1.0
 
-## Download for your platform
+Get the apps and firmware tools from the **[1.0 release](https://github.com/danny67999/gmk104-lighting-studio/releases/tag/v1.0)**.
 
-| Platform | Download | Requirements | Guide |
-| --- | --- | --- | --- |
-| Windows | [Windows 1.5.2.2 installer and portable ZIP](https://github.com/danny67999/gmk104-lighting-studio/releases/tag/windows-v1.5.2.2) | Windows 10/11 x64, .NET Framework 4.8 | [Windows guide](windows/README.md) |
-| macOS | [macOS 1.4.1 apps and disk image (stable)](https://github.com/danny67999/gmk104-lighting-studio/releases/tag/v1.4.1) | Apple Silicon, macOS 13+; adaptive music requires macOS 14.2+ | [macOS guide](#macos-app) |
+| Platform | Recommended download | Requirements |
+| --- | --- | --- |
+| Windows | `GMK104-Lighting-Studio-Windows-Setup-1.0.exe` — installs Lighting Studio and Firmware Flasher | Windows 10/11 x64, .NET Framework 4.8 |
+| macOS | `GMK104-Lighting-Studio-1.0-macOS-arm64.dmg` — drag both apps into Applications | Apple Silicon, macOS 13 or later |
 
-[All releases](https://github.com/danny67999/gmk104-lighting-studio/releases) · [Per-key RGB guide](docs/per-key-rgb.md) · [Documentation hub](docs/README.md)
+Portable Windows packages, separate Mac app ZIPs, the standalone firmware image, five complex profiles and checksums are also included. Keep the Windows portable app beside its bundled resources and `Firmware` folder.
 
-**Windows 1.5.2.2 fixes the USB freeze at "Connecting and checking the keyboard."** Exit the old app and run the updated installer over your existing installation. Your profiles are preserved; no uninstall or firmware reflash is needed.
+## Start here
 
-### Windows quick start
+1. Connect your GMK104 with a USB data cable and choose wired mode. If it still has stock firmware, use the separate firmware installer and choose **Complete lighting firmware 1.0**. Read its connection checks and confirmation before installing.
+2. Open Lighting Studio, connect, then add an effect or load a preset. Select keys directly on the keyboard diagram: drag across keys to paint a selection, or start dragging in a gap to draw a rectangle. Shift adds keys; Option on Mac or Alt on Windows removes them.
+3. Adjust each layer's **Speed**, color, opacity and selected keys. **Affect all keys** expands the effect's output while keeping the selected keys as triggers. Leave it off for a reactive effect that lights only each pressed key.
+4. Choose **Play on keyboard** to preview, or **Save to keyboard** to keep the layout after power-off. Both operations require wired USB and compatible firmware. Keep the connection until full readback verification completes.
 
-**[Documentation hub](docs/README.md)** — [installation](docs/getting-started.md), [individual-key colors and layers](docs/per-key-rgb.md), [troubleshooting](docs/troubleshooting.md), [firmware safety](docs/firmware-safety.md), and [developer guide](docs/development.md).
+## Effects and profiles
 
-1. Download and run **GMK104-Lighting-Studio-Windows-Setup-1.5.2.2.exe**. It installs both apps for the current user, with Start-menu icons and an optional desktop shortcut.
-2. Open **GMK104 Lighting Studio**, connect the keyboard and choose a color. Use **Manual lighting → Set all keys** once to establish a complete direct-RGB frame, then click any individual key to give it its own color.
-3. Use up to 16 layers for effects and key groups; choose **Apply & save layers**. Mac lighting profiles and the full 104-key map are supported.
+Firmware 1.0 plays ripple, rainbow ripple, reactive, rainbow reactive, hold, toggle, splash, cross ripple, row/column wave, wave, breathing, spectrum, static color, starlight, rainbow starlight, fire, color wheel, scanner, comet, rain, Aurora and three Matrix rain variants. Layers have independent speed, brightness, opacity, blend and key masks.
 
-Windows requires Windows 10/11 x64, .NET Framework 4.8 and compatible custom GMK104 firmware. Bluetooth and USB passed live read-only identity/state checks on the connected keyboard. The USB fix passed three fresh connections (122–146 ms) and a separate probe of the packaged application. All 2,279 offline assertions passed. Actual LED behavior and sustained streaming still require a user hardware check; receiver hardware remains untested. A working Bluetooth custom interface does **not** need reflashing simply to use Windows.
+**Spaced Matrix rain** uses fixed vertical key columns with every other column dark. **Matrix key rain** starts a finite trail at the top of the pressed key's column. **Key hold** stays lit until release; **Key toggle** changes state with each distinct press.
 
-**Firmware flashing remains wired-USB-only and experimental.** The standalone **GMK104 Firmware Flasher.exe** includes all four approved images and preserves the guarded engine's identity, checksum and confirmation checks. It does nothing to hardware on launch. Windows v0.3/v0.4 uploads remain untested; stock rollback is not a recovery mechanism for a USB-dead keyboard. These community Windows builds are unsigned. See [Windows verification limits](windows/VERIFICATION.md).
+Try the eight-layer **Neon Circuit, Matrix Overdrive, Crystal Storm, Solar Forge and Prism Arcade** profiles. They are bundled with both apps and also available as `GMK104-Complex-Profiles-1.0.zip`. Open/import a JSON profile, then play or save it to the keyboard. Exporting a file saves a computer copy; it does not upload it.
 
-## macOS app
+Mac playback and Play from PC stream effects from the computer. Their FPS controls affect host streaming; firmware playback uses its own bounded render schedule (up to 50 fps). Per-layer Speed changes motion and fading in either mode. Audio and CPU temperature need the computer as a live sensor source. Windows Radar is also a PC playback effect.
 
-The native macOS app provides per-key RGB lighting for the wired ZUOYA GMK104, with layered effects, system-audio response, CPU temperature colors, and a companion firmware installer. The remaining instructions describe the macOS source currently in this repository; Windows behavior is documented separately above.
+## Connections and firmware
 
-**[Download the macOS apps](https://github.com/danny67999/gmk104-lighting-studio/releases/tag/v1.4.1)**
+Both apps include USB, Bluetooth and 2.4 GHz lighting transports. Wireless host streaming is bandwidth-limited and depends on compatible firmware and receiver hardware. Use wired USB to upload profiles or flash firmware. Once saved, supported firmware runs the lighting itself without continuous computer streaming.
 
-Apple Silicon • macOS 13+ • Adaptive music requires macOS 14.2+
+Both installers contain exactly **five** images: complete **1.0**, previously published custom **v0.2, v0.3, v0.4**, and **stock recovery**. Intermediate local test images are excluded from the installer packages. [The catalog](firmware-catalog.json) records their SHA-256 hashes and release provenance.
 
-## Install
+This release groups the current Mac and Windows apps and complete firmware under version **1.0**. The complete image has CRC `7F2F4310` and is byte-identical to the previous local v1.8 image; it is not the older local persistent v1.0 (`D51110C3`). Firmware support is detected by protocol capabilities and identity rather than the release number alone.
 
-1. Download the release disk image and drag **GMK104 RGB Controller** and **GMK104 Firmware Installer** into Applications.
-2. Open the controller and connect one GMK104 over wired USB.
-3. The controller requires custom firmware v0.2. If it reports stock firmware, quit the controller and open the firmware installer. Inspect the keyboard before choosing an update.
-4. Enable **Input Monitoring** for GMK104 RGB Controller in System Settings → Privacy & Security, then click **Enable key response**. The button turns green only after the keyboard listener starts.
-5. Add effects with **Add layer**, then click **Apply & save layers**.
+Firmware modification is community-developed and reverse engineered. Flashing is wired-only, requires an exact recognized keyboard and explicit confirmation, and can require hardware recovery if boot fails. Stock recovery requires a keyboard that still answers over USB. The one-minute setting is the maximum wait for each USB exchange, not the total installation time. An uncertain upload is never retried automatically.
 
-These community builds are ad-hoc signed and are not Apple-notarized. On a first download, macOS may require **System Settings → Privacy & Security → Open Anyway**. Only open a download you trust. The app needs neither a driver installation nor an administrator helper.
+## Installation and verification
 
-## Effects and layers
+These builds are unsigned on Windows and ad-hoc signed on macOS, without Apple notarization. Your operating system may display an unrecognized-publisher warning. On Mac, use Privacy & Security → Open Anyway for a download you trust. Enable Input Monitoring for host key-response effects; on-keyboard effects read keys directly. See [getting started](docs/getting-started.md).
 
-Combine up to 16 layers, with independent effect, speed, intensity, opacity, blend mode, trigger keys and output coverage. The top layer appears above those below. **Normal** blends a layer over the background; **Add light** adds its color. Changes take effect when you apply and save.
+The 1.0 apps, catalog, profile format and firmware plans are checked offline on Mac and Windows. Hardware behavior and flashing are separate checks: release preparation does not flash the keyboard or establish compatibility with every GMK104 hardware revision. See [verification details](docs/verification-1.0.md).
 
-| Effect | Behavior |
-| --- | --- |
-| Ripple | A ring expands from each pressed key. |
-| Rainbow ripple | A rotating rainbow ring expands from each pressed key and mixes with other ripples. |
-| Reactive | Pressed keys light up and fade. |
-| Rainbow wave | A rainbow moves across the keyboard. |
-| Breathing | The selected color brightens and dims. |
-| Spectrum cycle | Colors cycle across the layer. |
-| Static color | A steady background or highlight. |
-| Adaptive music | Bass, mids and treble animate the keyboard from audio playing on the Mac. |
-| CPU temperature | The hottest readable CPU sensor sets a blue → green → red color. |
-
-**Affect all keys** controls where each layer renders. For example, select WASD as a Rainbow ripple layer's triggers and turn on Affect all keys: only WASD starts ripples, but their light travels across all 104 mapped keys. Turning it off confines the light to WASD. An empty key selection disables the layer's output.
-
-### Animation frame rate
-
-Choose **Animation FPS cap** (15, 30, 60, 90 or 120), then **Apply & save layers**. The default is 60. The live header shows achieved FPS alongside the applied cap. The cap is shared by the layer stack because the keyboard receives one combined frame. It changes frame pacing without changing the ripple's travel speed or duration. USB speed and readback verification may keep actual FPS below the selected cap. No USB safety checks are removed to chase a higher rate.
-
-Version 1.4 keeps ripple rings visible until they pass the farthest mapped key. Rainbow color cycling wraps independently of travel distance, so reaching the last hue cannot end the ripple. Speed controls travel time.
-
-### Adaptive music
-
-Add an Adaptive music layer and apply it. Allow **System Audio Recording** when macOS asks. The layer shows its capture status and a live audio meter. **Retry audio** restarts capture after a permission or audio-device change. Adjust sensitivity per layer; gain also adapts to playback volume automatically. Silence fades the layer away, exposing the layers below.
-
-The app uses a private [Core Audio process tap](https://developer.apple.com/documentation/coreaudio/capturing-system-audio-with-core-audio-taps), with unmuted playback. It does not use the microphone, save sound, or send audio to a server. Multiple music layers share one capture source. Capture stops when no applied, visible music layer needs it, when playback stops, or when the keyboard disconnects. Some protected audio sources may not permit capture.
-
-### CPU temperature
-
-Add a CPU temperature layer and apply it. The live label reports Celsius and the number of readable sensors. Set the blue and red endpoints independently for that layer (defaults: 40°C and 90°C). Green is halfway between them. These are lighting preferences, not hardware safety limits.
-
-Temperature comes from read-only AppleSMC CPU sensor values, not CPU utilization or macOS thermal-pressure estimates. Unavailable, invalid or stale readings leave the layer transparent and show an unavailable message. AppleSMC is an undocumented interface; sensor availability can change between Macs and macOS versions. Verified on an Apple M5 running macOS 27. No fan speeds, voltages or power settings are changed. See [technical references](THIRD_PARTY_NOTICES.md).
-
-## macOS Bluetooth and 2.4 GHz
-
-Lighting Studio's RGB control and the firmware installer's flashing path support **wired USB only**. The app does not implement Bluetooth or receiver RGB control. Normal Bluetooth/2.4 GHz keyboard operation with this custom firmware has not been verified; do not assume wireless compatibility from the wired tests. Use a cable for updates.
-
-## Mapping and reconnection
-
-The included 104-key map starts with **Escape at LED 0**, runs across each row, then moves to the next. Key mapping has a Back button and an undoable reset. Click a physical key on the diagram or press it to test its LED. This does not alter its assignment.
-
-If a key differs, use the advanced manual mapping controls: choose/light an LED, select its key, then save. Quick mapping captures a physical key and advances to the next LED. Assignments happen only while the mapping window is active. The row-layout preset can be reapplied with a backup and Undo.
-
-Mappings and lighting profiles are saved locally in `~/Library/Application Support/GMK104RgbController/`. A saved profile resumes after reconnect or relaunch when **Restore saved lighting after reconnect** is enabled. Stop saves a paused state. USB identity is checked before restoration. Closing the window keeps lighting running in the menu bar; quitting the app stops the host animations. Existing profiles and maps survive upgrades.
-
-## Firmware installer
-
-The companion installer packages the exact custom v0.2 image built and flashed on Windows, plus the approved stock rollback image. It opens with offline hash and packet checks, then offers read-only **Inspect keyboard**. Already-installed firmware requires no update. A real update requires a readiness checkbox and the exact displayed confirmation phrase.
-
-Use a stable wired USB connection and Mac power. Custom firmware is experimental. Keep the app open and the cable connected during upload and reboot. Stock rollback works only while the keyboard's OTA and RGB interfaces still respond; it is not a USB-dead recovery bootloader. See [the firmware guide](mac/Firmware/README.md) for approved transitions, checks and verification limits.
-
-## Build and test
-
-Install Xcode or current Apple Command Line Tools. From the repository root:
-
-```sh
-./mac/test.sh
-./mac/build.sh
-./mac/Firmware/build.sh
-./mac/package.sh
-```
-
-The app bundles and disk image appear in `outputs/`. The build targets Apple Silicon. No third-party package manager or network dependency is needed. A current SDK with Core Audio process-tap declarations is required to compile; the runtime checks macOS 14.2 availability.
-
-The tests use mock USB and isolated profiles. They cover exact firmware identity, complete RGB readback, checksums, status lights, mapping, layers, persistence, reconnects, stale callbacks, full-keyboard ripple travel, audio signal analysis, temperature colors, firmware image hashes and exact OTA stream equivalence, and interrupted transfers without retries.
-
-## USB verification
-
-Only the exact wired `320F:5055`, RGB usage `FF60:0061`, custom v0.2 signature and current USB attachment are accepted by the controller. Each lighting start verifies all 104 LEDs, the checksum and stable readback. Animation sends complete frames through one serialized writer, validates samples and checksums, and performs periodic complete audits. Obsolete frames are dropped rather than queued.
-
-Firmware v0.2 can force status-light slots 14, 33, 57 and 91 to white. Only those exact white overrides are accepted; other mismatches stop playback. Transport or attachment failures close the connection. A color-verification failure retains the connection only if that same keyboard and firmware still verify.
-
-The public release includes automated verification and native Mac checks. Physical LED labeling, RF modes, long-term firmware stability and USB-dead recovery remain device-specific checks. The Mac installer has been validated offline and by live read-only inspection; a real Mac flash has not been performed because the connected keyboard already has the target firmware.
-
-## Release verification
-
-September 11, 2026: local automated suites passed. Live system-audio playback moved the activity meter and keyboard framebuffer; silence returned the meter to zero. The temperature layer read 18 CPU sensors on Apple M5 and streamed its measured color. Input Monitoring showed an active keyboard listener. Original layers and the saved LED map were preserved. The firmware installer passed offline golden-stream checks and live read-only v0.2 inspection. No firmware was flashed from the Mac. Version 1.4.1 adds saved FPS limits with reconnect/relaunch and unapplied-edit isolation tests.
+[Documentation](docs/README.md) · [Mac guide](mac/README.md) · [Windows guide](windows/README.md) · [Build instructions](docs/development.md) · [All releases](https://github.com/danny67999/gmk104-lighting-studio/releases)
 
 ## License
 
-Current source uses the [GMK104 Free Use and No Resale License 1.0](LICENSE). **Free personal and internal business use, modification and free sharing are allowed. Selling the app or paid derivatives is prohibited without separate written permission.** This is a custom source-available license.
-
-The change takes effect for versions offered under the new license from September 14, 2026. Earlier MIT-licensed copies and existing release downloads retain their original permissions. Vendor-derived firmware and separately licensed third-party material are excluded; see [third-party notices](THIRD_PARTY_NOTICES.md).
+[GMK104 Free Use and No Resale License 1.0](LICENSE) permits personal use, internal business use, modification and free sharing. Selling the app or paid derivatives requires separate written permission. Earlier MIT-licensed copies retain those rights. Vendor-derived firmware and third-party components retain their respective rights and notices.

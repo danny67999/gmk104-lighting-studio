@@ -1,0 +1,33 @@
+{
+  "release": "1.0",
+  "previousRelease": "windows-v1.5.2.2",
+  "firmware": [
+    {
+      "file": "GMK104-firmware-1.0.bin",
+      "sha256": "4bdc3e9729a0583f2daea150fa1ccf4374c5115046f3b8f0655a4758b1dfe22e",
+      "origin": "1.0 complete image, previously local v1.8"
+    },
+    {
+      "file": "GMK104-custom-RGB-v0.2-experimental.bin",
+      "sha256": "96e431887f574cbe01e900ff08a803d8351ede421a982809e294f34b1e7f0fd4",
+      "origin": "GitHub windows-v1.5.2.2 source asset"
+    },
+    {
+      "file": "GMK104-custom-RGB-v0.3-experimental.bin",
+      "sha256": "cfb5604e1b861948078c0176801a74ef45727c96225145da82b25fb81b96dd8a",
+      "origin": "GitHub windows-v1.5.2.2 source asset"
+    },
+    {
+      "file": "GMK104-custom-RGB-v0.4-experimental.bin",
+      "sha256": "11db2cd854381021b45c0b025d7fabc5277cdbfed185a4e8af0e9327d7acc347",
+      "origin": "GitHub windows-v1.5.2.2 source asset"
+    },
+    {
+      "file": "GMK104-stock-recovery.bin",
+      "sha256": "fd6e3e8b9d67e2e4942634fcb5c44275f1b1b4f6975f1691318c5a1d44e1661f",
+      "origin": "GitHub windows-v1.5.2.2 source asset"
+    }
+  ],
+  "firmwareBytesChanged": false,
+  "hardwareValidation": "not flashed during release preparation"
+}

@@ -1,6 +1,6 @@
 param(
     [ValidateSet('DryRun','Inspect','TestConnection','Flash')][string]$Mode='DryRun',
-    [ValidateSet('Custom','Wireless','Streaming','Stock')][string]$Target='Wireless',
+    [ValidateSet('Release','Custom','Wireless','Streaming','Stock')][string]$Target='Release',
     [string]$Confirmation,
     [switch]$NoPause
 )

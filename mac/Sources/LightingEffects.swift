@@ -2,6 +2,9 @@ import Foundation
 
 enum LightingEffect: String, Codable, CaseIterable, Identifiable {
     case ripple, rainbowRipple, reactive, wave, breathing, spectrum, staticColor, adaptiveMusic, cpuTemperature
+    case keyHold, starlight, rainbowStarlight, fire, colorWheel, scanner, comet, rain, aurora
+    case keyToggle, rainbowReactive, splash, crossRipple, rowWave, columnWave
+    case matrixRain, spacedMatrixRain, matrixKeyRain
 
     var id: String { rawValue }
     var displayName: String {
@@ -15,11 +18,32 @@ enum LightingEffect: String, Codable, CaseIterable, Identifiable {
         case .staticColor: return "Static color"
         case .adaptiveMusic: return "Adaptive music"
         case .cpuTemperature: return "CPU temperature"
+        case .keyHold: return "Hold (press/release)"
+        case .starlight: return "Starlight"
+        case .rainbowStarlight: return "Rainbow starlight"
+        case .fire: return "Fire"
+        case .colorWheel: return "Color wheel"
+        case .scanner: return "Scanner"
+        case .comet: return "Comet"
+        case .rain: return "Rain"
+        case .aurora: return "Aurora"
+        case .keyToggle: return "Key toggle"
+        case .rainbowReactive: return "Rainbow reactive"
+        case .splash: return "Splash"
+        case .crossRipple: return "Cross ripple"
+        case .rowWave: return "Row wave"
+        case .columnWave: return "Column wave"
+        case .matrixRain: return "Matrix rain"
+        case .spacedMatrixRain: return "Spaced matrix rain"
+        case .matrixKeyRain: return "Matrix key rain"
         }
     }
-    var requiresKeyPresses: Bool { self == .ripple || self == .rainbowRipple || self == .reactive }
-    var requiresMapping: Bool { requiresKeyPresses || self == .wave || self == .adaptiveMusic }
-    var usesSelectedColor: Bool { ![.wave, .spectrum, .rainbowRipple, .adaptiveMusic, .cpuTemperature].contains(self) }
+    var requiresKeyPresses: Bool { [.ripple, .rainbowRipple, .reactive, .keyHold, .keyToggle, .rainbowReactive, .splash, .crossRipple, .rowWave, .columnWave, .matrixKeyRain].contains(self) }
+    var requiresMapping: Bool { requiresKeyPresses || ![.breathing, .spectrum, .staticColor, .cpuTemperature].contains(self) }
+    var usesSelectedColor: Bool { ![.wave, .spectrum, .rainbowRipple, .adaptiveMusic, .cpuTemperature,
+                                    .rainbowStarlight, .fire, .colorWheel, .aurora, .rainbowReactive].contains(self) }
+    var runsOnKeyboard: Bool { self != .adaptiveMusic && self != .cpuTemperature }
+    var hasAdjustableSpeed: Bool { ![.staticColor, .cpuTemperature, .keyHold, .keyToggle].contains(self) }
 }
 
 struct LightingSettings: Codable, Equatable {
@@ -81,6 +105,17 @@ struct KeyPulse {
     let time: TimeInterval
 }
 
+enum PulseTiming {
+    /// Keep a slow acknowledged connection from skipping an entire pulse while
+    /// a frame is in flight. New presses during that frame begin at age zero.
+    /// Continuous effects and audio sampling continue to use the real clock.
+    static func adjusted(_ pulses: [KeyPulse], previous: TimeInterval, now: TimeInterval,
+                         maximumStep: TimeInterval) -> [KeyPulse] {
+        let skipped = max(0, now - previous - maximumStep)
+        return pulses.map { KeyPulse(keyID: $0.keyID, time: min(now, $0.time + skipped)) }
+    }
+}
+
 enum LayerBlendMode: String, Codable, CaseIterable, Identifiable {
     case normal, additive
     var id: String { rawValue }
@@ -89,6 +124,12 @@ enum LayerBlendMode: String, Codable, CaseIterable, Identifiable {
 
 struct LightingLayer: Codable, Equatable, Identifiable {
     static let limit = 16
+    static let emptyCanvas: LightingLayer = {
+        var layer = LightingLayer(name:"Lights off",settings:LightingSettings(effect:.staticColor,color:.black))
+        layer.id = UUID(uuidString:"00000000-0000-4000-8000-000000000000")!
+        layer.enabled = false;layer.keyIDs = []
+        return layer
+    }()
     var id = UUID()
     var name: String
     var enabled = true
@@ -137,7 +178,7 @@ struct LightingLayer: Codable, Equatable, Identifiable {
     }
 
     static func validate(_ layers: [Self], allowedKeyIDs: Set<String>? = nil) throws {
-        try require((1...limit).contains(layers.count), "Use between 1 and \(limit) lighting layers.")
+        try require((0...limit).contains(layers.count), "Use up to \(limit) lighting layers.")
         try require(Set(layers.map(\.id)).count == layers.count, "Lighting layers must have unique identifiers.")
         for layer in layers { try layer.validate(allowedKeyIDs: allowedKeyIDs) }
     }
@@ -147,7 +188,8 @@ enum LayerRenderer {
     /// The UI lists topmost layers first. Compose bottom to top into a single
     /// framebuffer so adding layers never adds competing HID writers.
     static func frame(layers: [LightingLayer], keys: [KeyGeometry], mapping: MappingFile,
-                      pulses: [KeyPulse], time: TimeInterval, inputs: LightingInputs = LightingInputs()) -> [RGB] {
+                      pulses: [KeyPulse], time: TimeInterval, heldKeys: Set<String> = [], toggledKeys: Set<String> = [],
+                      inputs: LightingInputs = LightingInputs()) -> [RGB] {
         var result = Array(repeating: RGB.black, count: LightingRenderer.ledCount)
         let grouped = Dictionary(grouping: mapping.mappings.filter(\.confirmed), by: \.keyId)
         let indices = Dictionary(grouping: mapping.mappings.compactMap(\.ledIndex), by: { $0 })
@@ -157,8 +199,11 @@ enum LayerRenderer {
             // Trigger filtering belongs to each layer, so one layer's WASD
             // selection cannot consume or suppress another layer's key events.
             let layerPulses = layer.settings.effect.requiresKeyPresses ? pulses.filter { layer.acceptsTrigger($0.keyID) } : pulses
+            let layerHeld = Set(heldKeys.filter(layer.acceptsTrigger))
+            let layerToggled = Set(toggledKeys.filter(layer.acceptsTrigger))
             let colors = LightingRenderer.frame(settings: layer.settings, keys: keys, mapping: mapping,
-                                                pulses: layerPulses, time: time, reactiveAffectsAllKeys: layer.affectAllKeys, inputs: inputs)
+                                                pulses: layerPulses, time: time, reactiveAffectsAllKeys: layer.affectAllKeys,
+                                                heldKeys: layerHeld, toggledKeys: layerToggled, inputs: inputs)
             // The effect's white raster supplies coverage independent of its
             // chosen hue. Idle reactive pixels are transparent; static black is opaque.
             var coverageSettings = layer.settings
@@ -166,9 +211,11 @@ enum LayerRenderer {
             // A rainbow's combined RGB channels do not measure its opacity.
             // Use the same ripple envelope in white, independent of hue overlap.
             if coverageSettings.effect == .rainbowRipple { coverageSettings.effect = .ripple }
-            let coverage = layer.settings.effect.usesSelectedColor || layer.settings.effect == .rainbowRipple
+            if coverageSettings.effect == .rainbowReactive { coverageSettings.effect = .reactive }
+            let coverage = layer.settings.effect.usesSelectedColor || [.rainbowRipple, .rainbowReactive].contains(layer.settings.effect)
                 ? LightingRenderer.frame(settings: coverageSettings, keys: keys, mapping: mapping,
-                                         pulses: layerPulses, time: time, reactiveAffectsAllKeys: layer.affectAllKeys, inputs: inputs)
+                                         pulses: layerPulses, time: time, reactiveAffectsAllKeys: layer.affectAllKeys,
+                                         heldKeys: layerHeld, toggledKeys: layerToggled, inputs: inputs)
                 : colors
             let affectedKeyIDs = layer.affectAllKeys ? nil : layer.keyIDs
             let mask: Set<Int>? = affectedKeyIDs.map { ids in
@@ -205,7 +252,8 @@ enum LightingRenderer {
     /// confirmed LED mappings; unknown LEDs stay black. Brightness is a
     /// separate device setting so preview and transport share the same colors.
     static func frame(settings: LightingSettings, keys: [KeyGeometry], mapping: MappingFile,
-                      pulses: [KeyPulse], time: TimeInterval, reactiveAffectsAllKeys: Bool = false, inputs: LightingInputs = LightingInputs()) -> [RGB] {
+                      pulses: [KeyPulse], time: TimeInterval, reactiveAffectsAllKeys: Bool = false,
+                      heldKeys: Set<String> = [], toggledKeys: Set<String> = [], inputs: LightingInputs = LightingInputs()) -> [RGB] {
         let settings = settings.normalized
         var frame = Array(repeating: RGB.black, count: ledCount)
         if settings.intensity == 0 { return frame }
@@ -227,11 +275,40 @@ enum LightingRenderer {
             guard let temperature = inputs.temperature(at: time) else { return frame }
             let fraction = min(1, max(0, (temperature - settings.temperatureCold) / (settings.temperatureHot - settings.temperatureCold)))
             return Array(repeating: hueColor((1 - fraction) * (2.0 / 3), level: settings.intensity), count: ledCount)
-        case .ripple, .rainbowRipple, .reactive, .wave, .adaptiveMusic:
+        case .ripple, .rainbowRipple, .reactive, .wave, .adaptiveMusic, .keyHold,
+             .starlight, .rainbowStarlight, .fire, .colorWheel, .scanner, .comet, .rain, .aurora,
+             .keyToggle, .rainbowReactive, .splash, .crossRipple, .rowWave, .columnWave, .matrixRain, .spacedMatrixRain, .matrixKeyRain:
             break
         }
 
         let mapped = confirmedKeys(keys: keys, mapping: mapping)
+        if settings.effect == .spacedMatrixRain || settings.effect == .matrixKeyRain {
+            let known = Set(mapped.map(\.id))
+            let validPulses = pulses.filter { known.contains($0.keyID) }
+            for key in mapped {
+                frame[key.index] = settings.effect == .spacedMatrixRain
+                    ? LogicalMatrixRaster.automatic(keyID: key.id, time: clock, settings: settings)
+                    : LogicalMatrixRaster.reactive(keyID: key.id, time: clock, pulses: validPulses, settings: settings)
+            }
+            return frame
+        }
+        if settings.effect == .matrixRain {
+            let ys = mapped.map { Int(($0.y * 2).rounded()) }
+            guard let minY = ys.min(), let maxY = ys.max() else { return frame }
+            for key in mapped {
+                frame[key.index] = MatrixRainRaster.pixel(x: Int((key.x * 2).rounded()), y: Int((key.y * 2).rounded()),
+                    minY: minY, maxY: maxY, time: clock, settings: settings)
+            }
+            return frame
+        }
+        if settings.effect == .keyHold || settings.effect == .keyToggle {
+            let litKeys = settings.effect == .keyToggle ? toggledKeys : heldKeys
+            guard mapped.contains(where: { litKeys.contains($0.id) }) else { return frame }
+            for key in mapped where reactiveAffectsAllKeys || litKeys.contains(key.id) {
+                frame[key.index] = scale(settings.color, by: settings.intensity)
+            }
+            return frame
+        }
         if settings.effect == .adaptiveMusic {
             let audio = inputs.music.fresh(at: time)
             guard audio.level > 0, let minX = mapped.map(\.x).min(), let maxX = mapped.map(\.x).max(),
@@ -257,6 +334,56 @@ enum LightingRenderer {
             }
             return frame
         }
+        if [.starlight, .rainbowStarlight, .fire, .colorWheel, .scanner, .comet, .rain, .aurora].contains(settings.effect) {
+            guard let minX = mapped.map(\.x).min(), let maxX = mapped.map(\.x).max(),
+                  let minY = mapped.map(\.y).min(), let maxY = mapped.map(\.y).max() else { return frame }
+            let spanX = max(1, maxX - minX), spanY = max(1, maxY - minY)
+            let movement = wrapped(clock, period: 4 / settings.speed)
+            for key in mapped {
+                let x = (key.x - minX) / spanX, y = (key.y - minY) / spanY
+                let color: RGB
+                switch settings.effect {
+                case .starlight, .rainbowStarlight:
+                    let moment = wrapped(clock, period: 8 / settings.speed) * 8
+                    let tick = Int(moment), progress = moment - Double(tick)
+                    let seed = noise(Double(key.index) * 13.31 + Double(tick) * 71.9)
+                    let glow = seed > 0.80 ? pow(sin(.pi * progress), 2) : 0
+                    color = settings.effect == .starlight
+                        ? scale(settings.color, by: glow * settings.intensity)
+                        : hueColor(noise(Double(key.index) * 5.17 + Double(tick) * 3.77), level: glow * settings.intensity)
+                case .fire:
+                    let flicker = noise(Double(key.index) * 7.11 + floor(wrapped(clock, period: 16 / settings.speed) * 32) * 23.3)
+                    let flame = max(0.08, 0.85 - y * 0.52 + flicker * 0.38)
+                    color = hueColor(0.005 + (1 - y) * 0.09 + flicker * 0.025, level: flame * settings.intensity)
+                case .colorWheel:
+                    let angle = atan2(y - 0.5, x - 0.5) / (2 * .pi)
+                    color = hueColor(angle + movement, level: settings.intensity)
+                case .scanner:
+                    let position = 1 - abs(2 * movement - 1)
+                    let distance = abs(x - position)
+                    color = scale(settings.color, by: exp(-distance * distance / 0.003) * settings.intensity)
+                case .comet:
+                    let head = movement * 1.3 - 0.15
+                    let distance = head - x
+                    let glow = distance < 0 ? exp(-pow(distance / 0.025, 2)) : exp(-distance / 0.12)
+                    color = scale(settings.color, by: glow * settings.intensity)
+                case .rain:
+                    let column = floor(key.x * 1.6)
+                    let offset = noise(column * 12.7)
+                    let drop = wrapped(wrapped(clock, period: 3 / settings.speed) + offset, period: 1)
+                    let distance = abs(y - drop)
+                    let wrapDistance = min(distance, 1 - distance)
+                    color = scale(settings.color, by: exp(-pow(wrapDistance / 0.10, 2)) * settings.intensity)
+                case .aurora:
+                    let fold = sin(x * 13 + movement * 2 * .pi * 2 + y * 3)
+                    let band = exp(-pow((y - 0.48 - 0.22 * fold) / 0.28, 2))
+                    color = hueColor(0.38 + 0.12 * sin(x * 6 - movement * 2 * .pi), level: (0.08 + 0.92 * band) * settings.intensity)
+                default: color = .black
+                }
+                frame[key.index] = color
+            }
+            return frame
+        }
 
         guard time.isFinite else { return frame }
         let origins = Dictionary(uniqueKeysWithValues: mapped.map { ($0.id, $0) })
@@ -271,20 +398,36 @@ enum LightingRenderer {
             var level = 0.0
             var rainbow = (r: 0.0, g: 0.0, b: 0.0)
             for pulse in active {
-                if settings.effect == .reactive {
+                if settings.effect == .reactive || settings.effect == .rainbowReactive {
                     guard (reactiveAffectsAllKeys || key.id == pulse.origin.id), pulse.age < 1.4 else { continue }
                     let remaining = 1 - pulse.age / 1.4
-                    level += remaining * remaining
+                    let contribution = remaining * remaining
+                    level += contribution
+                    if settings.effect == .rainbowReactive {
+                        let color = hueColor(Double(pulse.origin.index) * 0.618 + pulse.age * 0.4, level: 1)
+                        rainbow.r += Double(color.r) * contribution
+                        rainbow.g += Double(color.g) * contribution
+                        rainbow.b += Double(color.b) * contribution
+                    }
                 } else {
-                    let distance = hypot(key.x - pulse.origin.x, key.y - pulse.origin.y)
-                    let radius = pulse.age * 8
+                    let dx = abs(key.x - pulse.origin.x), dy = abs(key.y - pulse.origin.y)
+                    let distance: Double
+                    let reach: Double
+                    switch settings.effect {
+                    case .rowWave: distance = dx; reach = mapped.map { abs($0.x - pulse.origin.x) }.max() ?? 0
+                    case .columnWave: distance = dy; reach = mapped.map { abs($0.y - pulse.origin.y) }.max() ?? 0
+                    case .crossRipple:
+                        guard min(dx, dy) <= 0.75 else { continue }
+                        distance = max(dx, dy); reach = mapped.map { max(abs($0.x - pulse.origin.x), abs($0.y - pulse.origin.y)) }.max() ?? 0
+                    default: distance = hypot(dx, dy); reach = pulse.reach
+                    }
+                    let radius = pulse.age * (settings.effect == .splash ? 6 : 8)
                     // A soft ring expands from the actual key center; its width
                     // grows gently as it travels and the tail fades to zero.
                     let width = 0.6 + radius * 0.045
-                    let offset = (distance - radius) / width
+                    let offset = (settings.effect == .splash ? max(0, distance - radius) : distance - radius) / width
                     // Keep a visible ring through the farthest key. Hue wraps
                     // independently and never limits the wave's travel distance.
-                    let reach = pulse.reach
                     let travelFade = 1 - 0.2 * min(1, radius / max(1, reach))
                     let exitFade = max(0, 1 - max(0, radius - reach) / (width * 3))
                     let contribution = exp(-0.5 * offset * offset) * travelFade * exitFade * exitFade
@@ -302,7 +445,7 @@ enum LightingRenderer {
                 }
             }
             // Overlapping key presses add light without wrapping color bytes.
-            if settings.effect == .rainbowRipple {
+            if settings.effect == .rainbowRipple || settings.effect == .rainbowReactive {
                 // Keep the mixed hue when overlaps reach full brightness. The
                 // frame stays premultiplied by the same coverage used by layers.
                 let amount = settings.intensity / max(1, level)
@@ -345,6 +488,11 @@ enum LightingRenderer {
     private static func wrapped(_ time: Double, period: Double) -> Double {
         let phase = time.truncatingRemainder(dividingBy: period) / period
         return phase < 0 ? phase + 1 : phase
+    }
+
+    private static func noise(_ seed: Double) -> Double {
+        let value = sin(seed * 12.9898) * 43758.5453
+        return value - floor(value)
     }
 
     private static func scale(_ color: RGB, by level: Double) -> RGB {

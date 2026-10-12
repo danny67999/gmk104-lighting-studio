@@ -18,6 +18,14 @@ import Foundation
         assert(KeyboardEvents.keyID(forUsage: 0xE1) == "ShiftLeft")
         assert(KeyboardEvents.keyID(forUsage: 0xE5) == "ShiftRight")
         print("PASS: unsupported usages are ignored; physical key variants remain distinct")
+        for name in BluetoothKeyboardIdentity.names {
+            assert(BluetoothKeyboardIdentity.matches(name: name, transport: "Bluetooth Low Energy"))
+            assert(BluetoothKeyboardIdentity.matches(name: name, transport: "BluetoothLowEnergy"))
+            assert(!BluetoothKeyboardIdentity.matches(name: name, transport: "USB"))
+            assert(!BluetoothKeyboardIdentity.matches(name: name, transport: "Bluetooth"))
+        }
+        assert(!BluetoothKeyboardIdentity.matches(name: "Other keyboard", transport: "Bluetooth Low Energy"))
+        print("PASS: both macOS BLE transport labels match the three GMK104 slots; other names and transports are rejected")
         // No monitor is started and no Input Monitoring permission is requested.
     }
 }

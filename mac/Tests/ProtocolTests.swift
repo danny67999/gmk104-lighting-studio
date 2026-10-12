@@ -1,5 +1,6 @@
 import Foundation
 final class MockTransport: ReportTransport {
+    var usesRollingAnimationVerification = false
     var frame = Array(repeating: RGB.black, count: 104)
     var brightness = 3; var effect = 1; var writes = [[UInt8]]()
     var reads = [Int]()
@@ -39,6 +40,20 @@ func rejects(_ label: String, _ action: () throws -> Void) throws {
         let t = MockTransport(); let c = RGBClient(t)
         _ = try c.read(); assert(t.writes.isEmpty)
         print("PASS: startup/read sends no lighting writes")
+        t.effect = 20
+        let nativeEffect = try c.read()
+        assert(nativeEffect.effect == 20)
+        t.effect = 1
+        print("PASS: on-keyboard effect 20 remains readable without a lighting write")
+        try c.effect(20)
+        assert(t.effect == 20 && t.writes.last == [7, 3, 2, 20])
+        let nativeWriteCount = t.writes.count
+        try rejects("direct RGB mode and unknown effects cannot use built-in selector") { try c.effect(19) }
+        try rejects("out-of-range on-keyboard effect rejected") { try c.effect(21) }
+        assert(t.writes.count == nativeWriteCount)
+        t.effect = 1
+        t.writes.removeAll()
+        print("PASS: on-keyboard effect 20 writes once and verifies readback")
         t.badSignature = true
         try rejects("v0.1 signature blocks writes") { try c.brightness(4) }; assert(t.writes.isEmpty)
         t.badSignature = false; t.multiple = true
@@ -100,6 +115,33 @@ func rejects(_ label: String, _ action: () throws -> Void) throws {
         try rejects("non-white indicator corruption is rejected") { try indicatorClient.setFrame(base) }
         indicators.firmwareColors[57] = white; indicators.firmwareColors[58] = white
         try rejects("white corruption outside the four firmware slots is rejected") { try indicatorClient.setFrame(base) }
+        let rolling = MockTransport(); rolling.usesRollingAnimationVerification = true
+        let rollingClient = RGBClient(rolling)
+        try rollingClient.setFrame(base)
+        var visited = Set<Int>()
+        for _ in 0..<52 {
+            rolling.reads = []
+            _ = try rollingClient.setAnimationFrame(base)
+            assert(rolling.reads.count <= 5 && rollingClient.shadow == nil)
+            visited.formUnion(rolling.reads)
+        }
+        assert(visited == Set(0..<104))
+        rolling.firmwareColors[91] = white
+        _ = try rollingClient.setAnimationFrame(base)
+        assert(rollingClient.indicatorOverrides == [91])
+        rolling.firmwareColors[100] = RGB(r: 255, g: 1, b: 1)
+        try rejects("Bluetooth whole-frame checksum catches unsampled corruption") { _ = try rollingClient.setAnimationFrame(base) }
+        rolling.firmwareColors = [:]
+        try rollingClient.setFrame(base)
+        rolling.corruptIndex = 53
+        try rejects("Bluetooth rolling samples reject bad color even when checksum matches") { _ = try rollingClient.setAnimationFrame(base) }
+        rolling.corruptIndex = nil; rolling.reads = []
+        _ = try rollingClient.setAnimationFrame(base, fullVerification: true)
+        assert(rolling.reads.count == 107)
+        let unverified = MockTransport(); unverified.usesRollingAnimationVerification = true; unverified.effect = 19
+        _ = try RGBClient(unverified).setAnimationFrame(base)
+        assert(unverified.reads.count == 107, "A new Bluetooth client must fully verify its initial frame")
+        print("PASS: Bluetooth visits every LED in 52 bounded frames, checks every checksum, preserves status lights and retains explicit full audits")
         let keys = try JSONDecoder().decode([KeyGeometry].self, from: Data(contentsOf: URL(fileURLWithPath: "mac/Resources/layout.json")))
         var map = try JSONDecoder().decode(MappingFile.self, from: Data(contentsOf: URL(fileURLWithPath: "mac/Resources/default-led-map.json")))
         try map.validate(keys: keys); assert(keys.count == 104)

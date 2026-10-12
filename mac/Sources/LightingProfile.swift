@@ -11,11 +11,16 @@ struct LightingProfile: Codable {
     var resume = true
     var layers: [LightingLayer]?
     var frameRate: Int?
+    /// Optional LED map makes exported layouts portable without replacing the
+    /// user's separately saved mapping when a file is merely opened.
+    var mapping: MappingFile?
 
     init(mode: LightingProfileMode, settings: LightingSettings, builtInEffect: Int = 1,
          colors: [RGB]? = nil, restoreOnReconnect: Bool = true, resume: Bool = true,
-         layers: [LightingLayer]? = nil, frameRate: Int? = nil) {
+         layers: [LightingLayer]? = nil, frameRate: Int? = nil,
+         mapping: MappingFile? = nil) {
         self.frameRate = frameRate
+        self.mapping = mapping
         self.mode = mode; self.settings = settings; self.builtInEffect = builtInEffect
         self.colors = colors; self.restoreOnReconnect = restoreOnReconnect; self.resume = resume
         self.layers = layers ?? (mode == .studio ? [LightingLayer(settings: settings)] : nil)
@@ -34,7 +39,7 @@ struct LightingProfile: Codable {
         if let frameRate { try require([15, 30, 60, 90, 120].contains(frameRate), "Animation FPS must be 15, 30, 60, 90 or 120.") }
         if let layers { try LightingLayer.validate(layers) }
         if version == 2 && mode == .studio { try require(layers != nil, "Saved studio profile is missing its layers.") }
-        try require((0...18).contains(builtInEffect), "Saved built-in effect is invalid.")
+        try require((0...18).contains(builtInEffect) || builtInEffect == 20, "Saved built-in effect is invalid.")
         if mode == .frame { try require(colors?.count == 104, "Saved lighting frame must contain 104 colors.") }
     }
     static var url: URL { MappingFile.saveURL.deletingLastPathComponent().appendingPathComponent("lighting-profile.json") }

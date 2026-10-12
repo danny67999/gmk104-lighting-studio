@@ -1,30 +1,11 @@
-# Firmware safety
+# Firmware installer 1.0
 
-[Documentation home](README.md)
+The Mac and Windows installers ship the same five hash-pinned images: complete lighting firmware 1.0, legacy custom v0.2/v0.3/v0.4, and stock recovery. These legacy images were already included in published GitHub releases. The intermediate local test builds are not offered by either installer. See `firmware-catalog.json` at the repository root for exact hashes.
 
-**Custom firmware is experimental. Flashing can leave the keyboard unusable. There is no established percentage risk and no guaranteed recovery if its normal USB interfaces stop enumerating.**
+Use a USB data cable, wired mode, stable computer power and one GMK104. Close Lighting Studio and other keyboard tools before the installer's inspection and transfer. Mac may require Input Monitoring and administrator approval for exclusive HID access. Windows provides offline validation, read-only inspection and a connection test before the explicit flash action.
 
-## Do you need to flash?
+The complete 1.0 image is 174,372 bytes, CRC 7F2F4310, SHA-256 4BDC3E9729A0583F2DAEA150FA1CCF4374C5115046F3B8F0655A4758B1DFE22E. It is the prior complete local v1.8 image with a public 1.0 filename, not the older local persistent v1.0 image. Known legacy identities remain recognized for supported upgrades and rollback. Unknown identities are rejected; rollback still requires working USB.
 
-If the controller already verifies its custom lighting interface, you do not need another flash to install an app update or switch computers. The Windows 1.5.2.2 USB fix is entirely in the application.
+Each flashing exchange may wait up to one minute. A separate overall deadline bounds the operation. If a transfer times out or loses its response, read its logs and check the keyboard's current state before another attempt. The tool does not automatically retry an uncertain flash. Never assume success just because progress reached the last block.
 
-Stock firmware does not become per-key-capable merely by installing Lighting Studio. If firmware is incompatible, use the platform-specific firmware guide to identify the installed image and allowed transition before deciding whether to proceed. Do not choose a target simply because it has the highest version number.
-
-## Separate tools, separate actions
-
-The controller never flashes firmware. Installing it, opening the guarded flasher or running an offline validation does not start a transfer. Firmware operations require **wired USB**, not Bluetooth or a receiver.
-
-- **Offline validation / DryRun** checks bundled images and transfer plans without opening the keyboard.
-- **Inspect** reads the connected device identity.
-- **TestConnection** performs sustained read-only checks; it is not a guarantee that a later flash will succeed.
-- **Flash** requires an allowed source/target transition, readiness checks, an exact typed phrase and interactive confirmation.
-
-Close the controller and other keyboard utilities before device inspection or flashing. Keep the computer powered and the USB connection stable. Never disconnect during an upload or automatically retry an uncertain transfer.
-
-## Recovery limits and provenance
-
-The bundled stock image is a rollback option only while the required USB interfaces still respond. It is not evidence of a USB-dead bootloader recovery method. After a failed or uncertain transfer, preserve the log and inspect the current state before deciding the next action.
-
-Windows v0.3/v0.4 upload paths have offline validation but were not flashed during Windows-port verification. Bluetooth lighting identity alone does not distinguish v0.3 from v0.4; wired inspection reads the installed CRC. Vendor-derived firmware retains its original provenance; the application source license does not grant rights to vendor firmware.
-
-Read the [Windows firmware guide](../windows/Firmware/README.md) or [Mac firmware guide](../mac/Firmware/README.md) for exact target transitions and checks. Also see [Windows verification limits](../windows/VERIFICATION.md). This overview intentionally does not provide a one-click flash command.
+Persistent storage is reverse engineered and checked by the firmware before committing. A failed boot can require hardware recovery. Neither application installation nor opening the firmware tool flashes anything automatically. The 1.0 release preparation runs offline tests and does not flash a physical keyboard.

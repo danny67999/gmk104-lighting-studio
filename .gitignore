@@ -1,7 +1,10 @@
 .DS_Store
+._*
 mac/.build/
 outputs/
 *.log
 windows/tests/*.exe
 windows/tests/*.dll
 work/
+__pycache__/
+*.pyc

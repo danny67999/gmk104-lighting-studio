@@ -29,6 +29,31 @@ import Foundation
         }
         print("PASS: both ripple types visibly reach all 104 keys from both keyboard edges and WASD at every speed, retain trigger masks, then expire")
 
+        for speed in [0.25, 1.0, 3.0] {
+            var layer = LightingLayer(settings: LightingSettings(effect: .rainbowRipple, speed: speed))
+            layer.keyIDs = ["KeyW"]; layer.affectAllKeys = true
+            var delayed = [KeyPulse(keyID: "KeyW", time: 100)]
+            var previous = 100.0
+            var visited = Set<Int>()
+            var last = [RGB]()
+            for step in 1...55 {
+                // Reproduce the slow Bluetooth case: a one-second frame and
+                // occasional five-second stalls. Every key must still light.
+                let current = previous + (step % 10 == 0 ? 5 : 1)
+                delayed = PulseTiming.adjusted(delayed, previous: previous, now: current, maximumStep: 0.1 / speed)
+                last = LayerRenderer.frame(layers: [layer], keys: keys, mapping: map, pulses: delayed, time: current)
+                for i in last.indices where peak(last[i]) > 50 { visited.insert(i) }
+                previous = current
+            }
+            assert(visited == Set(0..<104), "Slow Bluetooth skipped a key at speed \(speed)")
+            assert(last.allSatisfy { $0 == .black }, "A delayed ripple must eventually expire")
+        }
+        let newPress = PulseTiming.adjusted([KeyPulse(keyID: "KeyW", time: 104.9)], previous: 100, now: 105, maximumStep: 0.1)
+        assert(newPress[0].time == 105)
+        let fast = PulseTiming.adjusted([KeyPulse(keyID: "KeyW", time: 100)], previous: 100, now: 100.01, maximumStep: 0.1)
+        assert(fast[0].time == 100)
+        print("PASS: slow Bluetooth frames cannot expire a ripple at WASD; every key lights and the pulse finishes, while fast timing stays unchanged")
+
         var analyzer = MusicAnalyzer()
         func tone(_ frequency: Double, amplitude: Double, block: Int) -> [Float] {
             (0..<1024).map { Float(sin(Double(block * 1024 + $0) * 2 * .pi * frequency / 48_000) * amplitude) }

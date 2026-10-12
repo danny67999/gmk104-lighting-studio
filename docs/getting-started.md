@@ -1,35 +1,13 @@
-# Getting started
+# Install and connect
 
-[Documentation home](README.md)
+Download from the [1.0 release](https://github.com/danny67999/gmk104-lighting-studio/releases/tag/v1.0). Windows: run the Setup EXE, or extract the complete portable ZIP. Mac: open the Apple Silicon DMG and drag both apps to Applications. Quit older copies before opening the new app. Existing computer profiles are stored separately and are not removed by the installer.
 
-Choose the Windows or macOS app for your computer. Lighting Studio plus compatible custom firmware adds **per-key RGB**, so each GMK104 key can have its own color. See [downloads for both platforms](../README.md#download-for-your-platform).
+These community builds have no trusted publisher signing certificate or Apple notarization. Only open downloads you trust. macOS may offer Open Anyway under System Settings → Privacy & Security. Do not disable operating-system security globally.
 
-## Windows installation
+Connect a GMK104 by USB data cable in wired mode. Open the separate firmware installer if compatible custom firmware is not yet installed. Choose Complete lighting firmware 1.0, inspect the keyboard, read the identified current/target firmware and confirm installation. The installer does not flash automatically on launch. Keep USB and computer power connected.
 
-1. Download **GMK104-Lighting-Studio-Windows-Setup-1.5.2.2.exe** from the [Windows release](https://github.com/danny67999/gmk104-lighting-studio/releases/tag/windows-v1.5.2.2).
-2. Fully exit any older Lighting Studio instance: right-click its system-tray icon and choose **Quit**. Closing the window only hides it in the tray.
-3. Run the installer. It installs the controller and a separate firmware flasher for your Windows user, with Start-menu entries and an optional desktop shortcut. Installation does not flash firmware.
-4. Open **GMK104 Lighting Studio** from the Start menu. Close VIA and other lighting controllers before connecting.
-5. Connect one GMK104, select the matching connection type and click **Connect**. The app verifies the compatible custom lighting protocol before allowing writes.
-6. Follow the [per-key RGB guide](per-key-rgb.md) to set your first colors.
+Open Lighting Studio, connect, add an effect or load a preset, then choose Play on keyboard or Save to keyboard. Save waits for a full readback; once verified, power-cycle and confirm that the lighting returns. A JSON export is a computer backup and does not change the keyboard until you upload it.
 
-Requirements: Windows 10/11 x64, .NET Framework 4.8 and compatible custom firmware. Builds are unsigned; only run trusted downloads. Do not disable Windows security protections to install this project.
+For host key-response effects, Mac needs Input Monitoring for GMK104 RGB Controller in Privacy & Security. Quit and reopen after permission changes. Windows uses Raw Input with its Enable key response control. On-keyboard effects detect key presses in firmware and do not need the desktop app running.
 
-## Windows connection options
-
-- **USB:** use a data-capable cable and switch the keyboard to wired mode. This is also the only connection allowed for firmware operations.
-- **Bluetooth:** pair the keyboard in Windows settings and select its paired Bluetooth mode on the keyboard. Lighting needs the custom firmware's Bluetooth service, not just a working typing connection.
-- **2.4 GHz:** connect the receiver and switch the keyboard to receiver mode. The code path is included, but this release has not been verified with receiver hardware.
-- **Auto:** the Windows app checks USB first, then Bluetooth, then the receiver. Select a specific transport when troubleshooting. Keep only one matching keyboard attached if identity is ambiguous.
-
-## Upgrade an installed copy
-
-Exit the old app and run the new installer over it. No uninstall is needed; saved profiles remain in `%LOCALAPPDATA%\GMK104RgbController`. Version 1.5.2.2 fixes the USB connection freeze without a firmware update.
-
-The portable ZIP is an alternative to installation. Extract the whole folder; keep the JSON resource files beside the controller EXE. Avoid running installed and portable copies together.
-
-## macOS
-
-Download the Mac disk image from the [releases page](https://github.com/danny67999/gmk104-lighting-studio/releases) and drag the controller and firmware installer into Applications. Use wired USB for the published Mac controller. See the [Mac installation instructions](../README.md#install) for Input Monitoring, platform requirements and the separate firmware workflow. The Windows installer cannot run on macOS.
-
-If the controller rejects the installed firmware, read [firmware safety](firmware-safety.md) before attempting an update. A working custom lighting connection does not need reflashing because you changed computers.
+On Mac, profiles are under `~/Library/Application Support/GMK104RgbController/`. On Windows, use Open profile folder; the default is `%LOCALAPPDATA%\GMK104RgbController`. Export/import lets you choose any JSON file location and transfer layouts between platforms.

@@ -10,14 +10,26 @@ final class HIDTransport: ReportTransport {
     private var callbackError: String?
     private var awaiting = false
     private var faulted = false
-    static let matching: [String: Any] = [
-        kIOHIDVendorIDKey: 0x320F, kIOHIDProductIDKey: 0x5055,
-        kIOHIDDeviceUsagePageKey: 0xFF60, kIOHIDDeviceUsageKey: 0x61
-    ]
-    static func candidates() -> [IOHIDDevice] {
+    private(set) var connectionName = "USB"
+    private(set) var reconnectsWithoutReplug = false
+    private let wiredOnly: Bool
+    static func matching(productID: Int) -> [String: Any] { [
+        kIOHIDVendorIDKey: 0x320F, kIOHIDProductIDKey: productID,
+        kIOHIDDeviceUsagePageKey: 0xFF60, kIOHIDDeviceUsageKey: 0x61,
+        kIOHIDTransportKey: "USB"
+    ] }
+    private static func devices(productID: Int) -> [IOHIDDevice] {
         let manager = IOHIDManagerCreate(kCFAllocatorDefault, IOOptionBits(kIOHIDOptionsTypeNone))
-        IOHIDManagerSetDeviceMatching(manager, matching as CFDictionary)
+        IOHIDManagerSetDeviceMatching(manager, matching(productID: productID) as CFDictionary)
         return (IOHIDManagerCopyDevices(manager) as? Set<IOHIDDevice>).map(Array.init) ?? []
+    }
+    static func preferWired<T>(_ wired: [T], receiver: () -> [T], wiredOnly: Bool) -> [T] {
+        wiredOnly || !wired.isEmpty ? wired : receiver()
+    }
+    static func candidates(wiredOnly: Bool = false) -> [IOHIDDevice] {
+        // A receiver can remain plugged in while the keyboard uses its cable.
+        // Never open both paths or send one frame to two different devices.
+        preferWired(devices(productID: 0x5055), receiver: { devices(productID: 0x5088) }, wiredOnly: wiredOnly)
     }
     static func registryID(of device: IOHIDDevice) throws -> UInt64 {
         let service = IOHIDDeviceGetService(device)
@@ -27,11 +39,14 @@ final class HIDTransport: ReportTransport {
                     "Unable to verify the keyboard’s USB identity. Reconnect and try again.")
         return entryID
     }
-    init() throws {
+    init(wiredOnly: Bool = false) throws {
+        self.wiredOnly = wiredOnly
         buffer.initialize(repeating: 0, count: 64)
-        let matches = Self.candidates()
-        try require(matches.count == 1, "Found \(matches.count) matching wired GMK104 interfaces. Connect exactly one keyboard by USB.")
+        let matches = Self.candidates(wiredOnly: wiredOnly)
+        try require(matches.count == 1, "Found \(matches.count) matching RGB interfaces. Connect one GMK104 by USB or connect its dongle and select 2.4 GHz mode.")
         let d = matches[0]
+        reconnectsWithoutReplug = (IOHIDDeviceGetProperty(d, kIOHIDProductIDKey as CFString) as? NSNumber)?.intValue == 0x5088
+        connectionName = reconnectsWithoutReplug ? "2.4 GHz" : "USB"
         let entryID = try Self.registryID(of: d)
         for key in [kIOHIDMaxInputReportSizeKey, kIOHIDMaxOutputReportSizeKey] {
             let size = (IOHIDDeviceGetProperty(d, key as CFString) as? NSNumber)?.intValue
@@ -43,8 +58,8 @@ final class HIDTransport: ReportTransport {
         registryEntryID = entryID
     }
     func checkSingleDevice() throws {
-        let matches = Self.candidates()
-        try require(matches.count == 1, "The number of matching keyboards changed. Reconnect exactly one wired GMK104.")
+        let matches = Self.candidates(wiredOnly: wiredOnly)
+        try require(matches.count == 1, "The number of matching keyboards changed. Connect exactly one GMK104.")
         guard device != nil, let registryEntryID else { throw ControllerError.message("Keyboard disconnected.") }
         // Each manager creates a new IOHIDDevice wrapper, so CFEqual compares different
         // objects even for the same keyboard. The registry entry identifies this exact
@@ -94,7 +109,9 @@ final class HIDTransport: ReportTransport {
         }
         guard result == kIOReturnSuccess, callbackError == nil, let response else {
             faulted = true
-            throw ControllerError.message(callbackError ?? "GMK104 USB exchange failed or timed out (\(result)). Reconnect the keyboard.")
+            throw TransportUnavailableError(message: callbackError ?? (reconnectsWithoutReplug
+                ? "The 2.4 GHz receiver is present, but the keyboard did not answer (\(result)). Wake it and select 2.4 GHz mode."
+                : "GMK104 USB exchange failed or timed out (\(result)). Reconnect the keyboard."))
         }
         return response
     }

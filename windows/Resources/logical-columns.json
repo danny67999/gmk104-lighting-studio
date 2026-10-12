@@ -1,0 +1,530 @@
+{
+  "preview_only": true,
+  "columns": [
+    {
+      "column": 1,
+      "keys": [
+        {
+          "id": "Escape",
+          "row": 1
+        },
+        {
+          "id": "Backquote",
+          "row": 2
+        },
+        {
+          "id": "Digit1",
+          "row": 2
+        },
+        {
+          "id": "Tab",
+          "row": 3
+        },
+        {
+          "id": "CapsLock",
+          "row": 4
+        },
+        {
+          "id": "ShiftLeft",
+          "row": 5
+        },
+        {
+          "id": "ControlLeft",
+          "row": 6
+        }
+      ]
+    },
+    {
+      "column": 2,
+      "keys": [
+        {
+          "id": "F1",
+          "row": 1
+        },
+        {
+          "id": "Digit2",
+          "row": 2
+        },
+        {
+          "id": "KeyQ",
+          "row": 3
+        },
+        {
+          "id": "KeyA",
+          "row": 4
+        },
+        {
+          "id": "KeyZ",
+          "row": 5
+        },
+        {
+          "id": "AltLeft",
+          "row": 6
+        },
+        {
+          "id": "MetaLeft",
+          "row": 6
+        }
+      ]
+    },
+    {
+      "column": 3,
+      "keys": [
+        {
+          "id": "F2",
+          "row": 1
+        },
+        {
+          "id": "Digit3",
+          "row": 2
+        },
+        {
+          "id": "KeyW",
+          "row": 3
+        },
+        {
+          "id": "KeyS",
+          "row": 4
+        },
+        {
+          "id": "KeyX",
+          "row": 5
+        },
+        {
+          "id": "Space",
+          "row": 6
+        }
+      ]
+    },
+    {
+      "column": 4,
+      "keys": [
+        {
+          "id": "F3",
+          "row": 1
+        },
+        {
+          "id": "Digit4",
+          "row": 2
+        },
+        {
+          "id": "KeyE",
+          "row": 3
+        },
+        {
+          "id": "KeyD",
+          "row": 4
+        },
+        {
+          "id": "KeyC",
+          "row": 5
+        }
+      ]
+    },
+    {
+      "column": 5,
+      "keys": [
+        {
+          "id": "F4",
+          "row": 1
+        },
+        {
+          "id": "Digit5",
+          "row": 2
+        },
+        {
+          "id": "KeyR",
+          "row": 3
+        },
+        {
+          "id": "KeyF",
+          "row": 4
+        },
+        {
+          "id": "KeyV",
+          "row": 5
+        }
+      ]
+    },
+    {
+      "column": 6,
+      "keys": [
+        {
+          "id": "F5",
+          "row": 1
+        },
+        {
+          "id": "Digit6",
+          "row": 2
+        },
+        {
+          "id": "KeyT",
+          "row": 3
+        },
+        {
+          "id": "KeyG",
+          "row": 4
+        },
+        {
+          "id": "KeyB",
+          "row": 5
+        }
+      ]
+    },
+    {
+      "column": 7,
+      "keys": [
+        {
+          "id": "F6",
+          "row": 1
+        },
+        {
+          "id": "Digit7",
+          "row": 2
+        },
+        {
+          "id": "KeyY",
+          "row": 3
+        },
+        {
+          "id": "KeyH",
+          "row": 4
+        },
+        {
+          "id": "KeyN",
+          "row": 5
+        }
+      ]
+    },
+    {
+      "column": 8,
+      "keys": [
+        {
+          "id": "F7",
+          "row": 1
+        },
+        {
+          "id": "Digit8",
+          "row": 2
+        },
+        {
+          "id": "KeyU",
+          "row": 3
+        },
+        {
+          "id": "KeyJ",
+          "row": 4
+        },
+        {
+          "id": "KeyM",
+          "row": 5
+        }
+      ]
+    },
+    {
+      "column": 9,
+      "keys": [
+        {
+          "id": "F8",
+          "row": 1
+        },
+        {
+          "id": "Digit9",
+          "row": 2
+        },
+        {
+          "id": "KeyI",
+          "row": 3
+        },
+        {
+          "id": "KeyK",
+          "row": 4
+        },
+        {
+          "id": "Comma",
+          "row": 5
+        }
+      ]
+    },
+    {
+      "column": 10,
+      "keys": [
+        {
+          "id": "F9",
+          "row": 1
+        },
+        {
+          "id": "Digit0",
+          "row": 2
+        },
+        {
+          "id": "KeyO",
+          "row": 3
+        },
+        {
+          "id": "KeyL",
+          "row": 4
+        },
+        {
+          "id": "Period",
+          "row": 5
+        }
+      ]
+    },
+    {
+      "column": 11,
+      "keys": [
+        {
+          "id": "F10",
+          "row": 1
+        },
+        {
+          "id": "Minus",
+          "row": 2
+        },
+        {
+          "id": "KeyP",
+          "row": 3
+        },
+        {
+          "id": "Semicolon",
+          "row": 4
+        },
+        {
+          "id": "Slash",
+          "row": 5
+        },
+        {
+          "id": "AltRight",
+          "row": 6
+        }
+      ]
+    },
+    {
+      "column": 12,
+      "keys": [
+        {
+          "id": "F11",
+          "row": 1
+        },
+        {
+          "id": "Equal",
+          "row": 2
+        },
+        {
+          "id": "BracketLeft",
+          "row": 3
+        },
+        {
+          "id": "Quote",
+          "row": 4
+        },
+        {
+          "id": "ShiftRight",
+          "row": 5
+        },
+        {
+          "id": "MetaRight",
+          "row": 6
+        }
+      ]
+    },
+    {
+      "column": 13,
+      "keys": [
+        {
+          "id": "F12",
+          "row": 1
+        },
+        {
+          "id": "Backspace",
+          "row": 2
+        },
+        {
+          "id": "BracketRight",
+          "row": 3
+        },
+        {
+          "id": "Enter",
+          "row": 4
+        },
+        {
+          "id": "ContextMenu",
+          "row": 6
+        }
+      ]
+    },
+    {
+      "column": 14,
+      "keys": [
+        {
+          "id": "Backslash",
+          "row": 3
+        },
+        {
+          "id": "ControlRight",
+          "row": 6
+        }
+      ]
+    },
+    {
+      "column": 15,
+      "keys": [
+        {
+          "id": "PrintScreen",
+          "row": 1
+        },
+        {
+          "id": "Insert",
+          "row": 2
+        },
+        {
+          "id": "Delete",
+          "row": 3
+        },
+        {
+          "id": "ArrowLeft",
+          "row": 6
+        }
+      ]
+    },
+    {
+      "column": 16,
+      "keys": [
+        {
+          "id": "ScrollLock",
+          "row": 1
+        },
+        {
+          "id": "Home",
+          "row": 2
+        },
+        {
+          "id": "End",
+          "row": 3
+        },
+        {
+          "id": "ArrowUp",
+          "row": 5
+        },
+        {
+          "id": "ArrowDown",
+          "row": 6
+        }
+      ]
+    },
+    {
+      "column": 17,
+      "keys": [
+        {
+          "id": "Pause",
+          "row": 1
+        },
+        {
+          "id": "PageUp",
+          "row": 2
+        },
+        {
+          "id": "PageDown",
+          "row": 3
+        },
+        {
+          "id": "ArrowRight",
+          "row": 6
+        }
+      ]
+    },
+    {
+      "column": 18,
+      "keys": [
+        {
+          "id": "NumLock",
+          "row": 2
+        },
+        {
+          "id": "Numpad7",
+          "row": 3
+        },
+        {
+          "id": "Numpad4",
+          "row": 4
+        },
+        {
+          "id": "Numpad1",
+          "row": 5
+        },
+        {
+          "id": "Numpad0",
+          "row": 6
+        }
+      ]
+    },
+    {
+      "column": 19,
+      "keys": [
+        {
+          "id": "NumpadDivide",
+          "row": 2
+        },
+        {
+          "id": "Numpad8",
+          "row": 3
+        },
+        {
+          "id": "Numpad5",
+          "row": 4
+        },
+        {
+          "id": "Numpad2",
+          "row": 5
+        }
+      ]
+    },
+    {
+      "column": 20,
+      "keys": [
+        {
+          "id": "NumpadMultiply",
+          "row": 2
+        },
+        {
+          "id": "Numpad9",
+          "row": 3
+        },
+        {
+          "id": "Numpad6",
+          "row": 4
+        },
+        {
+          "id": "Numpad3",
+          "row": 5
+        },
+        {
+          "id": "NumpadDecimal",
+          "row": 6
+        }
+      ]
+    },
+    {
+      "column": 21,
+      "keys": [
+        {
+          "id": "NumpadSubtract",
+          "row": 2
+        },
+        {
+          "id": "NumpadAdd",
+          "row": 4
+        },
+        {
+          "id": "NumpadEnter",
+          "row": 6
+        }
+      ]
+    }
+  ],
+  "assumptions": [
+    "Left Win joins left Alt in column 2; space belongs to column 3.",
+    "Remaining main-key rows continue by key order; navigation and number-pad keys have explicit groups."
+  ]
+}

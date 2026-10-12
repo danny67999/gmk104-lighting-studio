@@ -46,6 +46,17 @@ namespace Gmk104LightingStudio
         {
             if (payload == null || payload.Length < 4 || payload.Length > 32 || payload[1] != 3) throw new ArgumentException("Unsupported lighting command.");
             byte[] p = (byte[])payload.Clone(); bool valid = false;
+            if (p[2] == 7)
+            {
+                if (bluetooth) throw new ArgumentException("On-keyboard profile upload requires wired USB.");
+                int op = p[3];
+                if (p[0] == 8) valid = (op == 0 && p.Length == 4) || (op == 5 && p.Length == 7 && p[6] > 0 && p[6] <= 19 && (p[4] | p[5] << 8) + p[6] <= OnboardProfile.MaximumSize);
+                if (p[0] == 7) valid = (op == 1 && p.Length == 14 && (p[8] | p[9] << 8) >= 32 && (p[8] | p[9] << 8) <= OnboardProfile.MaximumSize)
+                    || (op == 2 && p.Length >= 12 && p[10] > 0 && p[10] <= 21 && p.Length == 11 + p[10] && (p[8] | p[9] << 8) + p[10] <= OnboardProfile.MaximumSize)
+                    || ((op == 3 || op == 4 || op == 7) && p.Length == 8);
+                if (!valid) throw new ArgumentException("Invalid on-keyboard profile report.");
+                return new List<byte[]> { p };
+            }
             if (p[0] == 8) valid = p.Length == 4 && ((p[2] == 5 && p[3] < 104) || (p[2] == 6 && p[3] == 1));
             else if (p[0] == 7)
             {
@@ -60,7 +71,7 @@ namespace Gmk104LightingStudio
                     }
                 }
                 else if (p[2] == 6 && p.Length == 6 && p[3] == 1) { int seconds = p[4] | p[5] << 8; valid = seconds == 0 || (seconds >= 60 && seconds <= 3600); }
-                else valid = p.Length == 4 && ((p[2] == 1 && p[3] <= 4) || (p[2] == 2 && p[3] <= 18));
+                else valid = p.Length == 4 && ((p[2] == 1 && p[3] <= 4) || (p[2] == 2 && (p[3] <= 18 || p[3] == 20)));
             }
             if (!valid) throw new ArgumentException("Invalid lighting command or RGB range.");
             return new List<byte[]> { p };
@@ -154,7 +165,7 @@ namespace Gmk104LightingStudio
         {
             lock (sync)
             {
-                Available(); byte[] packet = LightingPackets.ValidateAndSplit(payload, false)[0]; byte[] report = new byte[33], response = new byte[33]; Array.Copy(packet, 0, report, 1, packet.Length);
+                Available(); if (payload != null && payload.Length >= 3 && payload[2] == 7 && product != 0x5055) throw new ArgumentException("Profile transfer requires wired USB."); byte[] packet = LightingPackets.ValidateAndSplit(payload, false)[0]; byte[] report = new byte[33], response = new byte[33]; Array.Copy(packet, 0, report, 1, packet.Length);
                 Task<int> read = null; Task write = null; Stopwatch timer = Stopwatch.StartNew();
                 try
                 {

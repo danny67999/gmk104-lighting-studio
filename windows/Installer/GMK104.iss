@@ -4,7 +4,7 @@
 #ifndef ArtifactDir
   #error ArtifactDir is required
 #endif
-#define ProductVersion "1.5.2.2"
+#define ProductVersion "1.0.0"
 [Setup]
 #ifdef SmokeTest
 AppId={{8057B21A-7C40-4F0F-A56D-14BFCA2CC104}
@@ -40,8 +40,10 @@ UninstallDisplayName=GMK104 Lighting Studio and Guarded Firmware Flasher
 [Tasks]
 Name: desktopicon; Description: "Create a desktop shortcut"; GroupDescription: "Shortcuts:"; Flags: checkedonce
 [Files]
+Source: "{#PayloadDir}\Profiles\*"; DestDir: "{app}\Profiles"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "{#PayloadDir}\GMK104 Lighting Studio.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#PayloadDir}\GMK104 Firmware Flasher.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#PayloadDir}\Firmware\*"; DestDir: "{app}\Firmware"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "{#PayloadDir}\layout.json"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#PayloadDir}\default-led-map.json"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#PayloadDir}\gmk104.ico"; DestDir: "{app}"; Flags: ignoreversion

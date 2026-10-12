@@ -82,12 +82,12 @@ namespace Gmk104LightingStudio
 
                 Call(form, "SetSelection", new List<string>());
                 Set(form, "selecting", true); Call(form, "UpdateSelection"); Call(form, "ClickKey", "KeyA");
-                Check(draft.layers[0].keyIDs.SequenceEqual(new[] { "KeyA" }) && Get<KeyboardView>(form, "keyboard").Selection.SetEquals(new[] { "KeyA" }), "onscreen selection changes draft trigger mask");
+                Check(draft.layers[0].keyIDs.SequenceEqual(new[] { "KeyA" }) && Get<KeyboardView>(form, "keyboard").Selection.SetEquals(new[] { "KeyA" }), "onscreen selection changes draft trigger mask; tab=" + Get<TabControl>(form, "tabs").SelectedIndex + "; selecting=" + Get<bool>(form, "selecting") + "; ids=" + String.Join(",", draft.layers[0].keyIDs));
                 Call(form, "ClickKey", "KeyA"); Check(draft.layers[0].keyIDs.Count == 0, "selecting same key toggles off");
                 var tabs = Get<TabControl>(form, "tabs"); IntPtr tabHandle = tabs.Handle; tabs.SelectedIndex = 2;
                 Check(!Get<bool>(form, "selecting") && Get<KeyboardView>(form, "keyboard").ShowIndices && Get<KeyboardView>(form, "keyboard").Selection == null, "mapping tab exits layer selection");
                 tabs.SelectedIndex = 0;
-                Check(!Get<KeyboardView>(form, "keyboard").ShowIndices && Get<Button>(form, "chooseButton").Text == "Choose keys", "returning from mapping resets selection button");
+                Check(!Get<KeyboardView>(form, "keyboard").ShowIndices && Get<KeyboardView>(form, "keyboard").SelectionEnabled, "returning from mapping restores automatic selection");
                 Check(Get<RGBClient>(form, "client") == null, "tab switching does not acquire a keyboard");
 
                 Call(form, "SetSelection", new List<string> { "KeyW", "KeyA", "KeyS", "KeyD" });
@@ -96,14 +96,37 @@ namespace Gmk104LightingStudio
                 Check(pulses.Count == 1 && draft.layers[0].keyIDs.Contains(pulses[0].keyID), "test pulse respects WASD trigger mask");
                 Get<LightingProfile>(form, "applied").layers[0].keyIDs.Clear(); pulses.Clear(); Call(form, "PreviewPulse");
                 Check(pulses.Count == 0, "test pulse does not invent an empty trigger");
-                for (int i = 0; i < 100; i++) Call(form, "Pressed", "KeyA");
-                Check(pulses.Count == 48, "keyboard events retain newest 48 pulses");
+                for (int i = 0; i < 100; i++) { Call(form, "Released", "KeyA"); Call(form, "Pressed", "KeyA"); }
+                Check(pulses.Count == 48, "distinct press/release cycles retain newest 48 pulses");
+                var lastPulse = pulses[pulses.Count - 1];
+                bool wasToggled = Get<HashSet<string>>(form, "toggledKeys").Contains("KeyA");
+                Call(form, "Pressed", "KeyA");
+                Check(Object.ReferenceEquals(lastPulse, pulses[pulses.Count - 1]) && Get<HashSet<string>>(form, "toggledKeys").Contains("KeyA") == wasToggled, "held-key repeats add no pulse and never repeat a toggle");
                 Set(form, "playing", false);
 
                 Call(form, "AddLayer"); Check(draft.layers.Count == 2 && Get<ListBox>(form, "layersBox").SelectedIndex == 0 && draft.layers[0].settings.effect == "staticColor", "adding selects new top layer");
                 Call(form, "DuplicateLayer"); Check(draft.layers.Count == 3 && draft.layers[0].id != draft.layers[1].id && !Object.ReferenceEquals(draft.layers[0].settings, draft.layers[1].settings), "copy layer has independent settings and identity");
                 string moved = draft.layers[0].id; Call(form, "MoveLayer", 1); Check(draft.layers[1].id == moved && Get<ListBox>(form, "layersBox").SelectedIndex == 1, "reordering keeps selected layer");
                 Call(form, "RemoveLayer"); Check(draft.layers.Count == 2, "remove retains valid stack");
+
+                string beforeClear = Json.Serialize(draft);
+                Call(form, "ClearAllEffects"); Check(Get<LightingProfile>(form, "profile").layers.Count == 0, "clear all leaves an empty editable draft");
+                var blank = Get<LightingProfile>(form, "profile"); blank.Validate(keys);
+                Check(OnboardProfile.Compile(blank, keys, map, map).Bytes[6] == 1 && blank.layers.Count == 0, "empty draft compiles without inventing editor layers");
+                Call(form, "UndoLighting"); Check(Json.Serialize(Get<LightingProfile>(form, "profile")) == beforeClear, "Undo restores the complete previous draft");
+                var board = Get<KeyboardView>(form, "keyboard"); board.Size = new System.Drawing.Size(1000, 300); board.SelectionEnabled = true;
+                var first = System.Drawing.Rectangle.Round(board.BoundsFor(keys[0])); var second = System.Drawing.Rectangle.Round(board.BoundsFor(keys[1]));
+                var dragStart = new System.Drawing.Point(first.Left + first.Width / 2, first.Top + first.Height / 2);
+                var dragEnd = new System.Drawing.Point(second.Left + second.Width / 2, second.Top + second.Height / 2);
+                Call(form, "SetSelection", new List<string>());
+                Call(board, "OnMouseDown", new MouseEventArgs(MouseButtons.Left, 1, dragStart.X, dragStart.Y, 0));
+                Call(board, "OnMouseMove", new MouseEventArgs(MouseButtons.Left, 0, dragEnd.X, dragEnd.Y, 0));
+                Call(board, "OnMouseUp", new MouseEventArgs(MouseButtons.Left, 1, dragEnd.X, dragEnd.Y, 0));
+                Check(Get<LightingProfile>(form, "profile").layers[0].keyIDs.Contains(keys[0].id) && Get<LightingProfile>(form, "profile").layers[0].keyIDs.Contains(keys[1].id), "brush drag selects multiple keys");
+                Call(board, "OnMouseDown", new MouseEventArgs(MouseButtons.Left, 1, 0, 0, 0));
+                Call(board, "OnMouseMove", new MouseEventArgs(MouseButtons.Left, 0, second.Right + 2, second.Bottom + 2, 0));
+                Call(board, "OnMouseUp", new MouseEventArgs(MouseButtons.Left, 1, second.Right + 2, second.Bottom + 2, 0));
+                Check(Get<LightingProfile>(form, "profile").layers[0].keyIDs.Contains(keys[0].id) && Get<LightingProfile>(form, "profile").layers[0].keyIDs.Contains(keys[1].id), "rectangle drag from gap selects keys");
 
                 string mapBefore = Json.Serialize(Get<MappingFile>(form, "map"));
                 var candidate = Get<MappingFile>(form, "map").Clone(); candidate.Assign("KeyA", 0);
@@ -136,6 +159,18 @@ namespace Gmk104LightingStudio
                 legacy.Save(profilePath); form = NewForm();
                 Check(Get<LightingProfile>(form, "profile").layers[0].id == "00000000-0000-4000-8000-000000000001" && Get<ComboBox>(form, "effectBox").SelectedIndex == 2, "legacy Mac profile loads stable editable layer");
                 Check(Get<RGBClient>(form, "client") == null && !Get<bool>(form, "playing"), "preview never auto-resumes an imported profile");
+                string beforePreset = File.ReadAllText(profilePath), savedBeforePreset = Json.Serialize(Get<LightingProfile>(form, "savedProfile"));
+                Get<ComboBox>(form, "presetBox").SelectedItem = "Neon Radar"; Call(form, "LoadPreset");
+                Check(Get<LightingProfile>(form, "profile").layers[0].settings.effect == "radar" && !Get<bool>(form, "playing"), "Preset loads radar as paused draft");
+                Check(File.ReadAllText(profilePath) == beforePreset && Json.Serialize(Get<LightingProfile>(form, "savedProfile")) == savedBeforePreset, "Preset never overwrites saved profile");
+                Call(form, "AddLayer"); Check(Get<TextBox>(form, "layerName").Text == "Static color 2", "New layer numbered after preset background");
+                Call(form, "DuplicateLayer"); Check(Get<TextBox>(form, "layerName").Text == "Static color 3", "Duplicate automatic name gets next number");
+                Get<ComboBox>(form, "effectBox").SelectedItem = "Radar";
+                Check(Get<TextBox>(form, "layerName").Text == "Radar 2", "Changing effect updates automatic name without collision");
+                Get<TextBox>(form, "layerName").Text = "My accent"; Get<ComboBox>(form, "effectBox").SelectedItem = "CPU temperature";
+                Check(Get<TextBox>(form, "layerName").Text == "My accent", "Changing effect preserves custom name");
+                Check(Get<Label>(form, "effectHint").Text.Contains("Requires LibreHardwareMonitor"), "CPU dependency visible when selected");
+                Check(Get<RGBClient>(form, "client") == null && File.ReadAllText(profilePath) == beforePreset, "All new UI edits remain offline and unsaved");
                 DisposeForm(form); form = null;
                 Console.WriteLine("PASS: " + checks + " isolated Studio UI integration checks; no device connections or lighting commands.");
                 return 0;

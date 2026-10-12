@@ -104,7 +104,97 @@ import Foundation
         try layerComposition()
         try layerTriggerReach()
         try rainbowRipple()
+        try keyHoldAndNewEffects()
+        try reactiveExtensions()
         print("All lighting renderer checks passed.")
+    }
+
+    static func keyHoldAndNewEffects() throws {
+        let keys = [key("A", x: 0), key("B", x: 3), key("C", x: 7)]
+        let mapping = MappingFile(schemaVersion: 1, layoutId: "ansi-104", ledCount: 104, mappings: [
+            KeyMapping(keyId: "A", ledIndex: 0, confirmed: true),
+            KeyMapping(keyId: "B", ledIndex: 1, confirmed: true),
+            KeyMapping(keyId: "C", ledIndex: 2, confirmed: true)
+        ])
+        let red = RGB(r: 240, g: 0, b: 0), blue = RGB(r: 0, g: 0, b: 180)
+        let background = LightingLayer(settings: LightingSettings(effect: .staticColor, color: blue))
+        var hold = LightingLayer(settings: LightingSettings(effect: .keyHold, color: red))
+        hold.keyIDs = ["A"]
+        func render(_ down: Set<String>, at time: Double = 10) -> [RGB] {
+            LayerRenderer.frame(layers: [hold, background], keys: keys, mapping: mapping,
+                                pulses: [], time: time, heldKeys: down)
+        }
+        assert(render([]).allSatisfy { $0 == blue })
+        assert(render(["B"]).allSatisfy { $0 == blue })
+        assert(render(["A"])[0] == red && render(["A"])[1] == blue)
+        assert(render(["A"], at: 1000)[0] == red)
+        assert(render([])[0] == blue)
+        hold.affectAllKeys = true
+        let all = render(["A"])
+        assert(all[0] == red && all[1] == red && all[2] == red && all[3] == blue)
+        assert(render(["B"]).allSatisfy { $0 == blue })
+        print("PASS: key hold stays lit until release, respects triggers and all-key reach, and reveals lower layers")
+
+        let extra: [LightingEffect] = [.starlight, .rainbowStarlight, .fire, .colorWheel,
+                                       .scanner, .comet, .rain, .aurora]
+        let fullKeys = try JSONDecoder().decode([KeyGeometry].self, from: Data(contentsOf: URL(fileURLWithPath: "mac/Resources/layout.json")))
+        let fullMap = try MappingFile.rowOrder(keys: fullKeys)
+        for effect in extra {
+            var settings = LightingSettings(effect: effect, color: RGB(r: 70, g: 180, b: 250))
+            let first = LightingRenderer.frame(settings: settings, keys: fullKeys, mapping: fullMap, pulses: [], time: 0.5)
+            let later = LightingRenderer.frame(settings: settings, keys: fullKeys, mapping: fullMap, pulses: [], time: 1.5)
+            assert(first.count == 104 && first.contains { $0 != .black })
+            assert(first != later, "\(effect.displayName) must animate")
+            settings.speed = 2
+            let faster = LightingRenderer.frame(settings: settings, keys: fullKeys, mapping: fullMap, pulses: [], time: 0.75)
+            assert(faster == later, "\(effect.displayName) speed must scale time")
+            assert(effect.runsOnKeyboard)
+        }
+        print("PASS: eight new animations render across the keyboard and respond to per-layer speed")
+    }
+
+    static func reactiveExtensions() throws {
+        let keys = try JSONDecoder().decode([KeyGeometry].self, from: Data(contentsOf: URL(fileURLWithPath: "mac/Resources/layout.json")))
+        let map = try MappingFile.rowOrder(keys: keys)
+        let red = RGB(r: 240, g: 20, b: 0), blue = RGB(r: 0, g: 0, b: 180)
+        var toggle = LightingLayer(settings: LightingSettings(effect: .keyToggle, color: red))
+        toggle.keyIDs = ["Escape"]
+        let base = LightingLayer(settings: LightingSettings(effect: .staticColor, color: blue))
+        func latched(_ ids: Set<String>) -> [RGB] {
+            LayerRenderer.frame(layers: [toggle, base], keys: keys, mapping: map, pulses: [], time: 999, toggledKeys: ids)
+        }
+        assert(latched([]).allSatisfy { $0 == blue })
+        assert(latched(["KeyW"]).allSatisfy { $0 == blue })
+        assert(latched(["Escape"])[0] == red && latched(["Escape"])[1] == blue)
+        toggle.affectAllKeys = true
+        assert(latched(["Escape"]).allSatisfy { $0 == red })
+        for effect: LightingEffect in [.rainbowReactive, .splash, .crossRipple, .rowWave, .columnWave] {
+            var layer = LightingLayer(settings: LightingSettings(effect: effect, color: red))
+            layer.keyIDs = ["Escape"]; layer.affectAllKeys = true
+            let press = [KeyPulse(keyID: "Escape", time: 0)]
+            let idle = LayerRenderer.frame(layers: [layer, base], keys: keys, mapping: map, pulses: [], time: 0)
+            assert(idle.allSatisfy { $0 == blue })
+            let wrong = LayerRenderer.frame(layers: [layer, base], keys: keys, mapping: map, pulses: [KeyPulse(keyID: "KeyW", time: 0)], time: 0)
+            assert(wrong == idle)
+            let early = LightingRenderer.frame(settings: layer.settings, keys: keys, mapping: map, pulses: press, time: 0.2)
+            let later = LightingRenderer.frame(settings: layer.settings, keys: keys, mapping: map, pulses: press, time: 0.8)
+            assert(early.contains { $0 != .black } && early != later)
+            layer.settings.speed = 2
+            assert(later == LightingRenderer.frame(settings: layer.settings, keys: keys, mapping: map, pulses: press, time: 0.4))
+            let ended = LightingRenderer.frame(settings: layer.settings, keys: keys, mapping: map, pulses: press, time: 10)
+            assert(ended.allSatisfy { $0 == .black })
+            layer.affectAllKeys = false
+            let limited = LayerRenderer.frame(layers: [layer], keys: keys, mapping: map, pulses: press, time: 0)
+            assert(limited.dropFirst().allSatisfy { $0 == .black })
+        }
+        for effect: LightingEffect in [.splash, .rowWave] {
+            let settings = LightingSettings(effect: effect, color: red)
+            let far = map.mappings.first { $0.keyId == "NumpadEnter" }!.ledIndex!
+            assert((0..<450).contains { t in
+                LightingRenderer.frame(settings: settings, keys: keys, mapping: map, pulses: [KeyPulse(keyID: "Escape", time: 0)], time: Double(t) / 100)[far] != .black
+            }, "The new effect must reach the number pad")
+        }
+        print("PASS: toggle state and five press effects respect triggers, masks, transparency, speed, expiry, and board reach")
     }
 
     static func layerComposition() throws {

@@ -176,7 +176,8 @@ namespace Gmk104LightingStudio
                 bad = valid.Clone(); bad.builtInEffect = 19; invalidCases.Add(bad);
                 bad = valid.Clone(); bad.mode = "frame"; bad.colors = new RGB[103]; invalidCases.Add(bad);
                 bad = valid.Clone(); bad.layers = null; invalidCases.Add(bad);
-                bad = valid.Clone(); bad.layers.Clear(); invalidCases.Add(bad);
+                var empty = valid.Clone(); empty.layers.Clear(); empty.Save(path);
+                Check(LightingProfile.Load(path).layers.Count == 0, "empty Mac/Windows draft roundtrip");
                 bad = valid.Clone(); bad.layers.Add(bad.layers[0].Clone()); invalidCases.Add(bad);
                 bad = valid.Clone(); bad.layers[0].opacity = 1.1; invalidCases.Add(bad);
                 bad = valid.Clone(); bad.layers[0].keyIDs.Add("KeyW"); invalidCases.Add(bad);

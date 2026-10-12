@@ -2,7 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
+using System.Linq;
 using System.Management;
+
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -18,6 +20,7 @@ namespace Gmk104LightingStudio
         private readonly Dictionary<IntPtr, HashSet<string>> devices = new Dictionary<IntPtr, HashSet<string>>();
         private bool registered;
         public event Action<string> KeyPressed;
+        public event Action<string> KeyReleased;
         public string Status { get; private set; }
         public bool IsRunning { get { return registered; } }
 
@@ -70,7 +73,12 @@ namespace Gmk104LightingStudio
             if (!registered) return;
             if (message.Msg == 0x00FE && message.WParam.ToInt64() == 2)
             {
-                devices.Remove(message.LParam);
+                HashSet<string> removed;
+                if (devices.TryGetValue(message.LParam, out removed))
+                {
+                    devices.Remove(message.LParam);
+                    foreach (var key in removed) if (!devices.Values.Any(x => x.Contains(key)) && KeyReleased != null) KeyReleased(key);
+                }
                 if (devices.Count == 0) { Stop(); Status = "GMK104 input disconnected; reconnect to resume key reactions"; }
                 return;
             }
@@ -96,7 +104,7 @@ namespace Gmk104LightingStudio
                 string key = KeyForScanCode(scan, flags, vkey);
                 if (key == null) return;
                 bool down = (flags & 1) == 0;
-                if (!down) { held.Remove(key); return; }
+                if (!down) { bool removed = held.Remove(key); if (removed && !devices.Values.Any(x => x.Contains(key)) && KeyReleased != null) KeyReleased(key); return; }
                 bool wasDown = false;
                 foreach (HashSet<string> other in devices.Values) if (other.Contains(key)) { wasDown = true; break; }
                 // Pause has no reliable break packet. It is not typematic and can pulse on each make.
@@ -117,9 +125,11 @@ namespace Gmk104LightingStudio
                 RawRegistration[] registration = { new RawRegistration { page = 1, usage = 6, flags = 1, target = IntPtr.Zero } };
                 RegisterRawInputDevices(registration, 1, (uint)Marshal.SizeOf(typeof(RawRegistration)));
             }
-            registered = false; devices.Clear(); Status = "Key reactions are stopped";
+            registered = false;
+            foreach (var key in devices.Values.SelectMany(x => x).Distinct().ToArray()) if (KeyReleased != null) KeyReleased(key);
+            devices.Clear(); Status = "Key reactions are stopped";
         }
-        public void Dispose() { Stop(); KeyPressed = null; }
+        public void Dispose() { Stop(); KeyPressed = null; KeyReleased = null; }
 
         // Set-1 physical positions; extended flags distinguish keypad/navigation and modifier sides.
         public static string KeyForScanCode(ushort scan, ushort flags, ushort virtualKey)
@@ -263,7 +273,9 @@ namespace Gmk104LightingStudio
         private double? temperature;
         private double temperatureTime = Double.NegativeInfinity, lastTemperatureRequest = Double.NegativeInfinity;
         private string audioStatus = "Windows audio is stopped";
-        private string temperatureStatus = "CPU temperature requires a running LibreHardwareMonitor or OpenHardwareMonitor WMI provider";
+        private string temperatureStatus = "CPU temperature needs a sensor provider. Click CPU setup for instructions.";
+        private string cpuLogDirectory = CpuSensorLog.DefaultDirectory;
+        public string CpuLogDirectory { get { lock (sync) return cpuLogDirectory; } set { lock (sync) { cpuLogDirectory = value; temperature = null; lastTemperatureRequest = Double.NegativeInfinity; } } }
 
         public static double MonotonicTime { get { return (double)Stopwatch.GetTimestamp() / Stopwatch.Frequency; } }
         public string AudioStatus { get { lock (sync) return audioStatus; } }
@@ -304,11 +316,20 @@ namespace Gmk104LightingStudio
             }
             ThreadPool.QueueUserWorkItem(delegate
             {
-                double? hottest = null; int count = 0; string provider = "";
+                double? hottest = null; int count = 0; string provider = ""; double sampleAge = 0;
+                string logDirectory = CpuLogDirectory;
                 try
                 {
+                    try
+                    {
+                        var logged = CpuSensorLog.ReadDirectory(logDirectory, DateTime.UtcNow);
+                        if (logged != null) { hottest = logged.Values.Max(); count = logged.Values.Count; sampleAge = logged.AgeSeconds; provider = "LibreHardwareMonitor local log"; }
+                    }
+                    catch (System.IO.IOException) { }
+                    catch (UnauthorizedAccessException) { }
                     foreach (string name in new[] { "LibreHardwareMonitor", "OpenHardwareMonitor" })
                     {
+                        if (hottest.HasValue) break;
                         try
                         {
                             List<double> values = ReadCpuTemperatures(name);
@@ -329,12 +350,12 @@ namespace Gmk104LightingStudio
                     lock (sync)
                     {
                         temperatureBusy = false;
-                        if (!disposed)
+                        if (!disposed && logDirectory == cpuLogDirectory)
                         {
-                            temperature = hottest; temperatureTime = MonotonicTime;
+                            temperature = hottest; temperatureTime = MonotonicTime - sampleAge;
                             temperatureStatus = hottest.HasValue ? String.Format(CultureInfo.InvariantCulture,
                                 "CPU {0:F1} °C · hottest of {1} sensors ({2})", hottest.Value, count, provider) :
-                                "CPU temperature unavailable · run LibreHardwareMonitor or OpenHardwareMonitor with WMI enabled";
+                                "CPU unavailable: start LibreHardwareMonitor with 1-second sensor logging. See CPU setup.";
                         }
                     }
                 }

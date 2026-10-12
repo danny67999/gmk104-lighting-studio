@@ -26,7 +26,11 @@ namespace Gmk104LightingStudio
 
         public static MappingFile Load(string path)
         {
-            var json = PersistJson.Read(path);
+            return FromJson(PersistJson.Read(path));
+        }
+        internal static MappingFile FromJson(object source)
+        {
+            var json = PersistJson.Object(source);
             var value = new MappingFile {
                 schemaVersion = PersistJson.Int(json, "schemaVersion"),
                 layoutId = PersistJson.String(json, "layoutId"),

@@ -42,7 +42,7 @@ namespace Gmk104LightingStudio
             Require(p != null && p.Length == 32, "Invalid lighting response length. Reconnect the keyboard.");
             Require(p.Take(11).SequenceEqual(Signature), "Compatible custom GMK104 firmware signature not found. Lighting controls are locked.");
             Require(p[11] == index, "The keyboard returned the wrong LED index.");
-            Require(p[15] <= 19 && p[16] <= 4, "The keyboard returned invalid lighting settings.");
+            Require(p[15] <= 20 && p[16] <= 4, "The keyboard returned invalid lighting settings.");
             return new RGBState { Index = index, Color = new RGB(p[12], p[13], p[14]), Effect = p[15], Brightness = p[16], Checksum = (ushort)(p[17] | p[18] << 8) };
         }
         public RGBState Read(int index = 0) { lock (sync) { Available(); ValidIndex(index); return Parse(Transport.Exchange(new byte[] { 8, 3, 5, (byte)index }), index); } }
@@ -79,6 +79,10 @@ namespace Gmk104LightingStudio
         }
         public void Clear() { lock (sync) { Gate(); shadow = null; animationBaseline = false; Transport.Exchange(new byte[] { 7, 3, 5, 0, 0 }); ReadFrame(new RGB[104]); } }
         public void SetBrightness(int value) { lock (sync) { Require(value >= 0 && value <= 4, "Brightness must be 0–4."); Gate(); animationBaseline = false; Transport.Exchange(new byte[] { 7, 3, 1, (byte)value }); Require(Read().Brightness == value, "Brightness readback did not match."); } }
+        internal void SelectOnboardEffect()
+        {
+            lock (sync) { Gate(); shadow = null; animationBaseline = false; Transport.Exchange(new byte[] { 7, 3, 2, 20 }); Require(Read().Effect == 20, "On-keyboard playback mode was not selected."); }
+        }
         public void SetEffect(int value) { lock (sync) { Require(value >= 0 && value <= 18, "Built-in effect must be 0–18."); Gate(); animationBaseline = false; Transport.Exchange(new byte[] { 7, 3, 2, (byte)value }); Require(Read().Effect == value, "Effect readback did not match."); } }
         public int? ReadSleepSeconds()
         {

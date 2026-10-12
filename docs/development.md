@@ -1,38 +1,11 @@
-# Developer guide
+# Build and test 1.0
 
-[Documentation home](README.md)
+Mac: Apple Silicon with Xcode command-line tools and Python 3. Run `./mac/test.sh`, `./mac/build.sh`, `./mac/Firmware/build.sh`, then `./mac/package.sh`. Tests use bundled stock firmware; no private analysis folder is required. The apps target macOS 13 and are ad-hoc signed.
 
-## Source layout
+Windows: Windows 10/11 x64, .NET Framework 4.8, Windows PowerShell 5.1 and Inno Setup 6.7.3. Run `powershell -NoProfile -ExecutionPolicy Bypass -File windows/build.ps1 -Tests`, then `windows/package.ps1 -InnoCompiler <path-to-ISCC.exe>`. Build scripts use the system .NET Framework C# compiler. Tests isolate saved state and do not open a keyboard. The installer does not flash firmware or register automatic startup.
 
-- `windows/`: native x64 C# WinForms controller, transport, RGB verification, effects and input/audio support.
-- `windows/tests/` and `windows/TransportTests.cs`: offline regression suites with isolated fixtures.
-- `windows/Installer/`: icon generator, Inno Setup recipe and separate guarded firmware launcher.
-- `windows/Firmware/`: approved firmware resources, guarded engine and offline tests.
-- `mac/`: native Swift controller, firmware companion and build/test scripts.
-- `release-assets/`: versioned release downloads and checksums. Published artifacts should not be replaced silently.
+Both platforms encode the GMKP profile format, with byte fixtures checked by the host apps and C firmware parser. Firmware renderer/storage tests use host sanitizers. The complete image is included, with reverse-engineered RISC-V patch sources in `mac/Firmware/Patches`. Rebuilding firmware is separate from building the desktop apps and requires the appropriate RISC-V toolchain and exact base image; do not substitute an unrelated keyboard image.
 
-## Build Windows
+`firmware-catalog.json` is the public package allowlist. `python3 scripts/verify-release-catalog.py` checks source image hashes and installer selections. Historical sources/images exist for regression and recognized installed identities; the packaged installer choices are deliberately limited to the five public images.
 
-From the repository root on Windows with the .NET Framework compiler installed:
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\windows\build.ps1 -Tests
-```
-
-The app is written for the installed .NET Framework C# compiler, not a required modern .NET SDK. It builds with overflow checks. Output is under `outputs\GMK104-Lighting-Studio-Windows`; test fixtures use new directories under `outputs\windows-test-results` rather than normal user profiles.
-
-Installer builds additionally need Inno Setup 6:
-
-```powershell
-.\windows\Installer\build-installer.ps1 -InnoCompiler 'C:\path\to\ISCC.exe'
-```
-
-The installer build reruns offline suites and validates all embedded firmware targets without flashing. The checked-in recipe targets the current packaging version. See [Mac build instructions](../README.md#build-and-test) for that platform.
-
-## Validation boundaries
-
-Windows 1.5.2.2 passed 2,279 offline assertions. Its four new stream checks exercise the same stream factory used by HID transport; they detect buffered report writes and read-ahead. The old 64-byte buffer could block within .NET Framework ReadAsync before the request or timeout was reached. A one-byte buffer bypasses managed buffering for the keyboard's 33-byte reports.
-
-Keep report validation, firmware identity gating, attachment checks, bounded exchanges and readback verification intact. Mock transport tests alone cannot establish live HID behavior. For hardware work, start with the [read-only probe](troubleshooting.md#read-only-windows-diagnostic), with other controllers closed. Treat LED writes and firmware flashing as distinct tests requiring deliberate authorization.
-
-Document which platform, connection and firmware were actually tested. Never claim that successful offline firmware plans prove a successful flash or a recoverable device. Do not bundle personal profiles, device logs, signing secrets or development credentials in a release.
+See verification-1.0.md for tested behavior and limits. Hardware probing, flashing and permanent writes are separate explicit operations and are never part of CI.

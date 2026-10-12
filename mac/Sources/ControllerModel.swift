@@ -12,6 +12,8 @@ struct ControllerEnvironment {
     var attachments: () -> (count: Int, registryID: UInt64?)
     var makeLightingInputs: (() -> LightingInputSource)?
     var inputMonitoringEnabled = true
+    var readInputPermission: () -> KeyboardEvents.Permission = { KeyboardEvents.permission }
+    var requestInputPermission: () -> Bool = { KeyboardEvents.requestPermission() }
     var mappingInputAllowed: () -> Bool = {
         NSApp.isActive && NSApp.keyWindow != nil && NSApp.keyWindow?.attachedSheet == nil &&
         NSApp.modalWindow == nil && RunLoop.current.currentMode != .eventTracking
@@ -21,28 +23,26 @@ struct ControllerEnvironment {
     var clock: () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }
 
     static var production: Self {
-        Self(layoutURL: Bundle.main.url(forResource: "layout", withExtension: "json"),
+        let connections = KeyboardConnections()
+        return Self(layoutURL: Bundle.main.url(forResource: "layout", withExtension: "json"),
              defaultMappingURL: Bundle.main.url(forResource: "default-led-map", withExtension: "json"),
              mappingURL: MappingFile.saveURL, profileURL: LightingProfile.url,
-             openTransport: {
-                 let transport = try HIDTransport()
-                 return (transport, transport.registryEntryID)
-             }, attachments: {
-                 let matches = HIDTransport.candidates()
-                 return (matches.count, matches.count == 1 ? try? HIDTransport.registryID(of: matches[0]) : nil)
-             }, makeLightingInputs: { NativeLightingInputSource() })
+             openTransport: { try connections.open() }, attachments: { connections.attachments() },
+             makeLightingInputs: { NativeLightingInputSource() })
     }
 }
 
 final class ControllerModel: ObservableObject {
-    @Published var status = "Connect your GMK104 by USB to read its firmware and lighting state."
+    @Published var status = "Connect your GMK104 by USB, 2.4 GHz or Bluetooth to read its firmware and lighting state."
     @Published var connected = false
+    @Published private(set) var connectionName = "USB"
     @Published var busy = false
     @Published var state: RGBState?
     @Published var frame: [RGB]?
     @Published var brightness = 3
     @Published var effect = 0
     @Published var layers = [LightingLayer()]
+    @Published private(set) var openedProfileName: String?
     @Published var selectedLayerID: UUID?
     @Published var selectingLayerKeys = false
     @Published var playing = false
@@ -52,16 +52,33 @@ final class ControllerModel: ObservableObject {
     private var inputGeneration = 0
     @Published var inputStatus = "Keyboard input is inactive"
     @Published var keyResponseEnabled = false
+    @Published private(set) var inputPermission: KeyboardEvents.Permission = .unknown
     @Published var indicatorNotice = ""
     @Published var measuredFPS = 0.0
     @Published var animationFPS = 60
+    @Published var sleepAfterSeconds = 300
+    @Published private(set) var appliedSleepSeconds: Int?
+    @Published private(set) var sleepSupported = false
+    @Published private(set) var sleepStatus = "Connect the keyboard to check its sleep setting."
+    @Published private(set) var onboardPreviewAvailable = false
+    @Published private(set) var onboardPersistentAvailable = false
+    @Published private(set) var onboardMaximumEffectID = 8
+    @Published private(set) var onboardPreviewActive = false
+    @Published private(set) var onboardLastTransferPersistent = false
+    @Published private(set) var onboardPreviewLayerCount = 0
+    @Published private(set) var onboardPreviewStatus = "Connect directly by USB, then check keyboard support for playback and saving."
+    @Published private(set) var onboardPreviewProgress: Double?
+    private var keyboardPreferences: KeyboardPreferences?
+    private var keyboardPreferencesURL: URL { environment.profileURL.deletingLastPathComponent().appendingPathComponent("keyboard-settings.json") }
     @Published private(set) var playingFPSLimit = 60
     @Published var lastPressedKey = "—"
     @Published var mappingMode = false {
         didSet {
             if mappingMode != oldValue {
                 resetMappingSelection()
-                if mappingMode { selectingLayerKeys = false; stopPlayback(savePausedState: false) }
+                if mappingMode {
+                    selectingLayerKeys = false; stopPlayback(savePausedState: false)
+                }
                 else { quickMapping = false; manualMapping = false }
             }
         }
@@ -71,6 +88,7 @@ final class ControllerModel: ObservableObject {
         didSet { if manualMapping != oldValue { quickMapping = false; resetMappingSelection() } }
     }
     @Published var canUndoMappingReset = false
+    @Published var confirmingMappingReset = false
     @Published var mappingIndex = 1 {
         didSet { if mappingIndex != oldValue { resetMappingSelection() } }
     }
@@ -86,17 +104,26 @@ final class ControllerModel: ObservableObject {
     private var frameTimer: Timer?
     private var connectionTimer: Timer?
     private var pulses: [KeyPulse] = []
+    private var heldKeys = Set<String>()
+    private var toggledKeys = Set<String>()
+    private var previewHeldKeys = Set<String>()
+    private var draftPulses: [KeyPulse] = []
+    private var draftHeldKeys = Set<String>()
+    private var draftToggledKeys = Set<String>()
     private var activeLayers: [LightingLayer]?
     private var profile: LightingProfile?
-    private var wantConnection = false
+    private var wantConnection = true
     private var connectionProbeInFlight = false
     private var frameInFlight = false
     private var generation = 0
+    private var onboardPreviewGeneration = 0
     private var attachedID: UInt64?
     private var blockedID: UInt64?
+    private var nextConnectionAttempt = TimeInterval.infinity
     private var lastRendered: [RGB]?
     private var lastAudit = 0.0
     private var lastFrameFinished = 0.0
+    private var lastAnimationSample = 0.0
     private var now: TimeInterval { environment.clock() }
 
     init(environment: ControllerEnvironment = .production) {
@@ -114,15 +141,23 @@ final class ControllerModel: ObservableObject {
             try loaded.validate(keys: keys); map = loaded
             profile = try LightingProfile.load(from: environment.profileURL)
             if let p = profile {
+                if let bundledMap = p.mapping {
+                    try bundledMap.validate(keys: keys)
+                    map = bundledMap
+                }
                 let loadedLayers = p.studioLayers
                 try LightingLayer.validate(loadedLayers, allowedKeyIDs: Set(keys.map(\.id)))
                 layers = loadedLayers; selectedLayerID = layers.first?.id
                 brightness = p.settings.brightness; effect = p.builtInEffect; animationFPS = p.frameRate ?? 60
                 restoreOnReconnect = p.restoreOnReconnect
-                wantConnection = p.restoreOnReconnect && p.resume
-                if wantConnection { status = "Waiting for the keyboard to restore your saved lighting…" }
+                if p.restoreOnReconnect && p.resume { status = "Waiting for the keyboard to restore your saved lighting…" }
             }
         } catch { status = "Saved configuration could not be loaded: \(error.localizedDescription)" }
+        do {
+            keyboardPreferences = try KeyboardPreferences.load(from: keyboardPreferencesURL)
+            if let keyboardPreferences { sleepAfterSeconds = keyboardPreferences.sleepSeconds }
+        } catch { sleepStatus = error.localizedDescription }
+        refreshInputPermission()
         canUndoMappingReset = FileManager.default.fileExists(atPath: mappingBackupURL.path)
         let timer = Timer(timeInterval: environment.connectionInterval, repeats: true) { [weak self] _ in self?.pollConnection() }
         connectionTimer = timer; RunLoop.main.add(timer, forMode: .common)
@@ -134,7 +169,7 @@ final class ControllerModel: ObservableObject {
         return RGB(r: byte(c.redComponent), g: byte(c.greenComponent), b: byte(c.blueComponent))
     }
     var selectedLayer: LightingLayer {
-        get { layers.first { $0.id == selectedLayerID } ?? layers.first ?? LightingLayer() }
+        get { layers.first { $0.id == selectedLayerID } ?? layers.first ?? LightingLayer.emptyCanvas }
         set {
             guard let index = layers.firstIndex(where: { $0.id == newValue.id }) else { return }
             layers[index] = newValue
@@ -145,7 +180,11 @@ final class ControllerModel: ObservableObject {
         set {
             var layer = selectedLayer
             if layer.name == layer.settings.effect.displayName { layer.name = newValue.effect.displayName }
-            layer.settings = newValue; selectedLayer = layer
+            var selected = newValue
+            if [.matrixRain, .spacedMatrixRain, .matrixKeyRain].contains(selected.effect) && layer.settings.effect != selected.effect {
+                selected.color = RGB(r: 0, g: 255, b: 32)
+            }
+            layer.settings = selected; selectedLayer = layer
         }
     }
     var selectedColor: Color {
@@ -163,12 +202,289 @@ final class ControllerModel: ObservableObject {
         return layers != profile.studioLayers || brightness != profile.settings.brightness || animationFPS != (profile.frameRate ?? 60)
     }
     var hasReactiveLayers: Bool { (activeLayers ?? layers).contains { $0.enabled && $0.settings.effect.requiresKeyPresses } }
+    var onboardEnabledLayerCount: Int { layers.filter(\.enabled).count }
+    var onboardCompatibleDraft: Bool {
+        layers.allSatisfy { layer in
+            layer.settings.effect.runsOnKeyboard &&
+            (OnboardProfile.effectIDs.firstIndex(of: layer.settings.effect) ?? Int.max) <= onboardMaximumEffectID
+        }
+    }
+    var onboardCompatibilityMessage: String? {
+        if layers.contains(where: { !$0.settings.effect.runsOnKeyboard }) {
+            return "Music and CPU temperature need live Mac input and cannot be stored on the keyboard."
+        }
+        if !onboardCompatibleDraft {
+            return "The connected keyboard firmware does not support every effect in this layout. Video-style vertical Matrix requires firmware v1.6; Key Toggle and the other new reactive effects require v1.2."
+        }
+        return nil
+    }
     var controlsLocked: Bool { busy || frameInFlight }
+    var savedProfilePath: String { environment.profileURL.path }
+    var savedProfileExists: Bool { FileManager.default.fileExists(atPath: environment.profileURL.path) }
 
+    private func clearOnboardPreviewState() {
+        onboardPreviewGeneration += 1
+        onboardPreviewAvailable = false
+        onboardPersistentAvailable = false
+        onboardMaximumEffectID = 8
+        onboardPreviewActive = false
+        onboardLastTransferPersistent = false
+        onboardPreviewLayerCount = 0
+        onboardPreviewProgress = nil
+        onboardPreviewStatus = "Connect directly by USB, then check keyboard support for playback and saving."
+    }
+
+    // This read-only query is also performed during USB connection. It never
+    // sends profile bytes, changes effects or commits storage. An older reply
+    // leaves Play/Save visible but unavailable. Preserve any active layout.
+    private func updateOnboardSupport(_ modes: OnboardUploader.SupportedModes?, state: RGBState) {
+        onboardPreviewAvailable = modes?.volatile ?? false
+        onboardPersistentAvailable = modes?.persistent ?? false
+        onboardMaximumEffectID = modes?.maximumEffectID ?? 8
+        onboardPreviewActive = modes?.volatile == true && modes!.activeProfileLength > 0 && state.effect == 20
+        if !onboardPreviewActive { onboardLastTransferPersistent = false; onboardPreviewLayerCount = 0 }
+        onboardPreviewStatus = connectionName != "USB"
+            ? "Connect a USB data cable to play or save a layout on the keyboard."
+            : onboardPersistentAvailable
+            ? "On-keyboard playback and permanent save are available."
+            : onboardPreviewAvailable
+            ? "Temporary keyboard playback is available; this firmware cannot save a layout after power-off."
+            : "This firmware does not support custom keyboard layouts. Install compatible firmware to use Play and Save."
+    }
+
+    /// Refresh only availability and reported playback state; never activate a profile.
+    func checkOnboardPreviewSupport() {
+        guard connected && connectionName == "USB" && !mappingMode && !busy && !frameInFlight,
+              let attachment = attachedID else { return }
+        busy = true
+        onboardPreviewStatus = "Checking keyboard firmware for on-keyboard playback and saving…"
+        status = onboardPreviewStatus
+        onboardPreviewGeneration += 1
+        let token = onboardPreviewGeneration
+        queue.async {
+            do {
+                guard let client = self.client, self.clientAttachmentID == attachment else {
+                    throw ControllerError.message("The keyboard connection changed. Reconnect before checking preview support.")
+                }
+                let firmwareState = try client.read()
+                let modes = try OnboardUploader(transport: client.transport).supportedModes()
+                DispatchQueue.main.async {
+                    guard token == self.onboardPreviewGeneration, self.connected, self.attachedID == attachment else { return }
+                    self.busy = false; self.state = firmwareState
+                    self.updateOnboardSupport(modes, state: firmwareState)
+                    self.status = self.onboardPreviewStatus
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    guard token == self.onboardPreviewGeneration else { return }
+                    self.onboardPreviewStatus = "Could not verify preview support: \(error.localizedDescription)"
+                }
+                self.failOnQueue(error)
+            }
+        }
+    }
+
+    private func compiledOnboardDraft() throws -> OnboardProfile {
+        guard let mapping = map, let factoryURL = environment.defaultMappingURL else {
+            throw ControllerError.message("The key mapping needed for this layout is missing.")
+        }
+        let factory = try JSONDecoder().decode(MappingFile.self, from: Data(contentsOf: factoryURL))
+        var summary = layers.first?.settings ?? LightingSettings()
+        summary.brightness = brightness
+        let draft = LightingProfile(mode: .studio, settings: summary,
+                                    restoreOnReconnect: restoreOnReconnect,
+                                    layers: layers, frameRate: animationFPS)
+        let prepared = try OnboardProfile.compile(draft, keys: keys, mapping: mapping, factoryMapping: factory)
+        try require(prepared.maximumEffectID <= onboardMaximumEffectID,
+                    "The connected keyboard firmware does not support one or more effects in this layout.")
+        try require(!prepared.needsMacAudio && !prepared.needsMacTemperature,
+                    "Music and CPU temperature need live Mac sensor updates. Turn those layers off to send the other effects to the keyboard.")
+        return prepared
+    }
+
+    /// Sends a draft to RAM without touching keyboard flash.
+    func previewOnKeyboard() { sendOnboard(persistent: false) }
+
+    /// Available only when firmware explicitly advertises persistent commit.
+    func saveOnKeyboard() { sendOnboard(persistent: true) }
+
+    private func sendOnboard(persistent: Bool) {
+        guard connected && connectionName == "USB" &&
+              (persistent ? onboardPersistentAvailable : onboardPreviewAvailable) &&
+              !mappingMode && !busy && !frameInFlight, let attachment = attachedID else { return }
+        let prepared: OnboardProfile
+        do { prepared = try compiledOnboardDraft() }
+        catch {
+            onboardPreviewStatus = "\(persistent ? "Save" : "Preview") was not sent: \(error.localizedDescription)"
+            status = onboardPreviewStatus
+            return
+        }
+        stopPlayback(savePausedState: false)
+        busy = true; onboardPreviewActive = false; onboardLastTransferPersistent = false
+        onboardPreviewLayerCount = 0; onboardPreviewProgress = 0
+        onboardPreviewStatus = persistent ? "Saving and verifying the layout on the keyboard…" : "Sending a temporary layout to the keyboard…"
+        status = onboardPreviewStatus
+        onboardPreviewGeneration += 1
+        let token = onboardPreviewGeneration
+        queue.async {
+            do {
+                guard let client = self.client, self.clientAttachmentID == attachment else {
+                    throw ControllerError.message("The keyboard connection changed. Reconnect before previewing.")
+                }
+                let uploader = OnboardUploader(transport: client.transport)
+                let updateProgress: (Int, Int) -> Void = { sent, total in
+                    DispatchQueue.main.async {
+                        guard token == self.onboardPreviewGeneration, self.connected,
+                              self.attachedID == attachment else { return }
+                        self.onboardPreviewProgress = Double(sent) / Double(total)
+                    }
+                }
+                let receipt = try persistent
+                    ? uploader.upload(prepared, progress: updateProgress)
+                    : uploader.activateVolatile(prepared, progress: updateProgress)
+                let firmwareState = try client.read()
+                try require(firmwareState.effect == 20,
+                            "The profile was read back, but the keyboard did not report on-keyboard effect mode 20.")
+                DispatchQueue.main.async {
+                    guard token == self.onboardPreviewGeneration, self.connected, self.attachedID == attachment else { return }
+                    self.busy = false; self.onboardPreviewActive = true; self.onboardPreviewProgress = nil
+                    self.onboardLastTransferPersistent = persistent
+                    self.onboardPreviewLayerCount = self.onboardEnabledLayerCount
+                    self.state = firmwareState; self.frame = nil
+                    self.brightness = firmwareState.brightness; self.effect = 20
+                    self.onboardPreviewStatus = persistent
+                        ? String(format: "Keyboard acknowledged saving %d layers; %d bytes, CRC %08X, and full readback verified. Check the LEDs and power-cycle to confirm the layout returns.",
+                                 self.onboardPreviewLayerCount, receipt.length, receipt.crc32)
+                        : String(format: "Temporary %d-layer profile readback verified: %d bytes, CRC %08X; keyboard reports effect 20. Check the LEDs to judge the effect. It expires after keyboard restart; nothing was saved to keyboard storage.",
+                                 self.onboardPreviewLayerCount, receipt.length, receipt.crc32)
+                    self.status = self.onboardPreviewStatus
+                }
+            } catch {
+                let attachmentChanged = self.environment.attachments().registryID != attachment
+                let observedState = error is TransportUnavailableError || attachmentChanged ? nil : try? self.client?.read()
+                if error is TransportUnavailableError || attachmentChanged { self.failOnQueue(error) }
+                DispatchQueue.main.async {
+                    guard token == self.onboardPreviewGeneration || error is TransportUnavailableError || attachmentChanged else { return }
+                    self.busy = false; self.onboardPreviewProgress = nil; self.onboardPreviewActive = false
+                    self.onboardLastTransferPersistent = false
+                    self.onboardPreviewLayerCount = 0
+                    self.onboardPreviewAvailable = false
+                    self.onboardPersistentAvailable = false
+                    if let observedState {
+                        self.state = observedState; self.effect = observedState.effect
+                        self.brightness = observedState.brightness
+                    }
+                    self.onboardPreviewStatus = persistent
+                        ? "Save result is uncertain: \(error.localizedDescription) Reconnect and inspect before another save; never retry automatically."
+                        : "Preview readback was not verified: \(error.localizedDescription) The keyboard may have started it; reconnect before retrying."
+                    self.status = self.onboardPreviewStatus
+                }
+            }
+        }
+    }
+    func stopOnboardPreview() {
+        guard onboardPreviewActive && connected && !busy && !mappingMode else { return }
+        run("Stop keyboard effect", operation: { try $0.effect(1) }, success: {
+            self.onboardPreviewStatus = self.onboardLastTransferPersistent
+                ? "Built-in effect 1 is active. The saved layout remains in keyboard storage; select effect 20 to play it again. Your Mac profile was not changed."
+                : "Built-in effect 1 is active. The temporary profile stays in keyboard RAM until restart and can resume if effect 20 is selected. Your saved Mac profile was not changed."
+            self.status = self.onboardPreviewStatus
+        })
+    }
+    func saveDraftToMac() {
+        guard !busy && !mappingMode else { return }
+        do {
+            let draft = try currentDraft()
+            let previous = profile
+            profile = draft
+            if saveProfile() { status = "Profile saved on this Mac at \(savedProfilePath). This did not write to keyboard storage." }
+            else { profile = previous }
+        } catch { status = "Draft was not saved: \(error.localizedDescription)" }
+    }
+    private func currentDraft() throws -> LightingProfile {
+        try LightingLayer.validate(layers, allowedKeyIDs: Set(keys.map(\.id)))
+        try require((0...4).contains(brightness) && [15, 30, 60, 90, 120].contains(animationFPS),
+                    "Choose valid brightness and animation settings before saving.")
+        var summary = layers.first?.settings ?? LightingSettings()
+        summary.brightness = brightness
+        return LightingProfile(mode: .studio, settings: summary,
+                               restoreOnReconnect: restoreOnReconnect, resume: false,
+                               layers: layers, frameRate: animationFPS, mapping: map)
+    }
+    func exportProfile(to url: URL) throws {
+        guard !busy && !mappingMode else { throw ControllerError.message("Finish the current keyboard action before exporting a profile.") }
+        try currentDraft().save(to: url)
+    }
+    func importProfile(from url: URL) throws {
+        guard !busy && !mappingMode else { throw ControllerError.message("Finish the current keyboard action before opening a profile.") }
+        guard let imported = try LightingProfile.load(from: url), imported.mode == .studio else {
+            throw ControllerError.message("Choose a Lighting Studio profile with effect layers.")
+        }
+        let proposed = imported.studioLayers
+        try LightingLayer.validate(proposed, allowedKeyIDs: Set(keys.map(\.id)))
+        if let bundledMap = imported.mapping { try bundledMap.validate(keys: keys) }
+        // Opening a file prepares an editable draft. It never overwrites the
+        // current saved profile or sends a packet to the keyboard.
+        layers = proposed
+        selectedLayerID = proposed.first?.id
+        brightness = imported.settings.brightness
+        animationFPS = imported.frameRate ?? 60
+        if let bundledMap = imported.mapping { map = bundledMap }
+        restoreOnReconnect = imported.restoreOnReconnect
+        selectingLayerKeys = false
+        openedProfileName = url.lastPathComponent
+        status = "Opened \(url.lastPathComponent)\(imported.mapping == nil ? "" : " with its LED mapping"). Review the layers, then choose Send layers to keyboard or Save to keyboard. Nothing was sent yet."
+    }
+    func chooseProfileFile() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.json]
+        panel.allowsMultipleSelection = false
+        panel.prompt = "Open profile"
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do { try importProfile(from: url) }
+        catch { status = "Profile could not be opened: \(error.localizedDescription)" }
+    }
+    func saveProfileFileAs() {
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.json]
+        panel.nameFieldStringValue = "GMK104-lighting-profile.json"
+        panel.prompt = "Save profile"
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do { try exportProfile(to: url); status = "Profile file saved at \(url.path)." }
+        catch { status = "Profile file could not be saved: \(error.localizedDescription)" }
+    }
+    func showSavedProfileInFinder() {
+        guard savedProfileExists else { status = "Save a profile on this Mac first."; return }
+        NSWorkspace.shared.activateFileViewerSelecting([environment.profileURL])
+    }
+
+    private var previousWorkspace: ([LightingLayer],UUID?)?
+    var canUndoWorkspace: Bool { previousWorkspace != nil }
+    func removeAllEffects() {
+        guard !busy && !mappingMode && !layers.isEmpty else { return }
+        previousWorkspace = (layers,selectedLayerID)
+        layers = [];selectedLayerID = nil;selectingLayerKeys = false
+        status = "All effects removed from this draft. Undo restores them. Play or Save to keyboard applies the change."
+    }
+    func applyPreset(_ preset: LightingPreset) {
+        guard !busy && !mappingMode else { return }
+        let proposed = preset.layers()
+        do { try LightingLayer.validate(proposed,allowedKeyIDs:Set(keys.map(\.id))) }
+        catch { status = error.localizedDescription;return }
+        previousWorkspace = (layers,selectedLayerID)
+        layers = proposed;selectedLayerID = proposed.first?.id;selectingLayerKeys = true
+        status = "\(preset.rawValue) loaded. Play on keyboard to try it, or Save to keyboard to keep it. Undo restores your previous layers."
+    }
+    func undoWorkspace() {
+        guard !busy && !mappingMode,let previous = previousWorkspace else { return }
+        layers = previous.0;selectedLayerID = previous.1;selectingLayerKeys = !layers.isEmpty
+        previousWorkspace = nil;status = "Previous layers restored in this draft."
+    }
     func addLayer(_ effect: LightingEffect) {
         guard !busy && layers.count < LightingLayer.limit else { return }
         var selected = LightingSettings(effect: effect)
         selected.brightness = brightness
+        if [.matrixRain, .spacedMatrixRain, .matrixKeyRain].contains(effect) { selected.color = RGB(r: 0, g: 255, b: 32) }
         let layer = LightingLayer(settings: selected)
         layers.insert(layer, at: 0); selectedLayerID = layer.id; selectingLayerKeys = false
     }
@@ -180,9 +496,10 @@ final class ControllerModel: ObservableObject {
         layers.insert(duplicate, at: index); selectedLayerID = duplicate.id
     }
     func removeLayer() {
-        guard !busy && layers.count > 1, let index = layers.firstIndex(where: { $0.id == selectedLayer.id }) else { return }
-        layers.remove(at: index); selectedLayerID = layers[min(index, layers.count - 1)].id
-        selectingLayerKeys = false
+        guard !busy && !layers.isEmpty, let index = layers.firstIndex(where: { $0.id == selectedLayer.id }) else { return }
+        previousWorkspace = (layers,selectedLayerID)
+        layers.remove(at:index);selectedLayerID = layers.isEmpty ? nil : layers[min(index,layers.count-1)].id
+        selectingLayerKeys = !layers.isEmpty
     }
     func moveLayer(_ offset: Int) {
         guard !busy, let index = layers.firstIndex(where: { $0.id == selectedLayer.id }), layers.indices.contains(index + offset) else { return }
@@ -200,24 +517,40 @@ final class ControllerModel: ObservableObject {
 
     func connect(automatic: Bool = false) {
         guard !busy && !connected else { return }
+        clearOnboardPreviewState()
         wantConnection = true
-        if !automatic { blockedID = nil }
+        if !automatic { blockedID = nil; nextConnectionAttempt = .infinity }
         busy = true; status = "Reading custom firmware signature…"
+        let savedSleepTime = keyboardPreferences?.sleepSeconds
         queue.async {
             self.client?.transport.close(); self.client = nil; self.clientAttachmentID = nil
             do {
                 let opened = try self.environment.openTransport()
                 let c = RGBClient(opened.transport); self.client = c; self.clientAttachmentID = opened.registryID
                 let s = try c.read()
+                var sleep = try c.readSleepSettings()
+                if let savedSleepTime, sleep != nil, sleep?.seconds != savedSleepTime {
+                    try c.setSleepTime(savedSleepTime); sleep = try c.readSleepSettings()
+                }
                 if s.effect == 19 { _ = try c.readFrame() }
                 let colors = s.effect == 19 ? c.shadow : nil
                 let id = opened.registryID
+                let connectionName = opened.transport.connectionName
+                let modes = connectionName == "USB" ? try OnboardUploader(transport: opened.transport).supportedModes() : nil
+                let sleepState = sleep
                 DispatchQueue.main.async {
                     self.connected = true; self.busy = false; self.state = s; self.frame = colors; self.attachedID = id
-                    self.brightness = s.brightness; self.effect = min(18, s.effect)
-                    self.status = "Connected • Custom firmware v0.2 verified"
+                    self.connectionName = connectionName; self.blockedID = nil; self.nextConnectionAttempt = .infinity
+                    self.updateOnboardSupport(modes, state: s)
+                    self.brightness = s.brightness; self.effect = s.effect == 20 ? 20 : min(18, s.effect)
+                    self.status = "\(connectionName) connected • Custom firmware interface verified"
+                    self.sleepSupported = sleepState != nil; self.appliedSleepSeconds = sleepState?.seconds
+                    if let sleepState {
+                        self.sleepAfterSeconds = sleepState.seconds
+                        self.sleepStatus = "Keyboard sleep: \(KeyboardPreferences.label(sleepState.seconds)). Saved changes are reapplied by this Mac after reconnect."
+                    } else { self.sleepStatus = "Changing wireless sleep time requires firmware v0.3." }
                     self.startKeyboardInput()
-                    if self.restoreOnReconnect && self.profile?.resume == true && !self.mappingMode { self.restoreProfile() }
+                    if self.restoreOnReconnect && self.profile?.resume == true && !self.mappingMode && !self.onboardPreviewActive { self.restoreProfile() }
                 }
             } catch { self.failOnQueue(error) }
         }
@@ -233,29 +566,35 @@ final class ControllerModel: ObservableObject {
                     self.stopPlayback(savePausedState: false)
                     self.connected = true; self.attachedID = id; self.busy = false
                     self.state = current; self.frame = nil; self.resetMappingSelection()
-                    self.status = "\(error.localizedDescription) USB is still connected. Try the lighting action again."
+                    self.status = "\(error.localizedDescription) \(self.connectionName) is still connected. Try the lighting action again."
                 }
                 return
             } catch { /* Identity or transport also failed: close below. */ }
         }
-        let failedID = clientAttachmentID
+        let failedID = clientAttachmentID ?? environment.attachments().registryID
+        let retryWirelessly = error is TransportUnavailableError && (client?.transport.reconnectsWithoutReplug ?? true)
         client?.transport.close(); client = nil; clientAttachmentID = nil
         DispatchQueue.main.async {
+            self.clearOnboardPreviewState()
             self.blockedID = failedID ?? self.attachedID
+            self.nextConnectionAttempt = retryWirelessly ? self.now + 5 : .infinity
             self.stopPlayback(savePausedState: false)
             self.keyboardEvents?.stop(); self.keyboardEvents = nil
             self.keyResponseEnabled = false
             self.connected = false; self.busy = false; self.state = nil; self.frame = nil
+            self.sleepSupported = false; self.appliedSleepSeconds = nil
             self.attachedID = nil; self.resetMappingSelection()
-            self.status = "\(error.localizedDescription) Waiting for USB reconnection; click Connect to retry."
+            self.status = "\(error.localizedDescription) \(retryWirelessly ? "Saved lighting will resume automatically when the keyboard answers." : "Click Connect to retry.")"
             self.inputStatus = "Keyboard disconnected"
         }
     }
     func disconnect() {
         wantConnection = false; stopPlayback(savePausedState: false)
+        clearOnboardPreviewState()
         keyboardEvents?.stop(); keyboardEvents = nil
         keyResponseEnabled = false
         busy = true; connected = false; attachedID = nil
+        sleepSupported = false; appliedSleepSeconds = nil
         queue.async {
             self.client?.transport.close(); self.client = nil; self.clientAttachmentID = nil
             DispatchQueue.main.async {
@@ -265,6 +604,7 @@ final class ControllerModel: ObservableObject {
         }
     }
     private func pollConnection() {
+        refreshInputPermission()
         guard wantConnection && !busy && !frameInFlight && !connectionProbeInFlight else { return }
         connectionProbeInFlight = true
         queue.async {
@@ -275,23 +615,53 @@ final class ControllerModel: ObservableObject {
                 if self.connected {
                     if id != self.attachedID {
                         self.stopPlayback(savePausedState: false)
+                        self.clearOnboardPreviewState()
                         self.keyboardEvents?.stop(); self.keyboardEvents = nil
                         self.keyResponseEnabled = false
                         self.connected = false; self.attachedID = nil; self.state = nil; self.frame = nil
+                        self.sleepSupported = false; self.appliedSleepSeconds = nil
                         self.resetMappingSelection()
                         self.queue.async { self.client?.transport.close(); self.client = nil; self.clientAttachmentID = nil }
                         self.status = snapshot.count > 1 ? "Connect exactly one GMK104 keyboard." : "Keyboard unplugged. Your lighting profile will resume after reconnection."
                     }
-                } else if let id, id != self.blockedID { self.connect(automatic: true) }
+                } else if let id, id != self.blockedID || self.now >= self.nextConnectionAttempt { self.connect(automatic: true) }
                 else if id == nil { self.blockedID = nil }
             }
         }
     }
+    var inputPermissionLabel: String {
+        switch inputPermission {
+        case .granted: return "Input Monitoring: Enabled"
+        case .denied: return "Input Monitoring: Off"
+        case .unknown: return "Input Monitoring: Not allowed yet"
+        }
+    }
+    // Permission and an active listener are distinct states. Checking never
+    // requests access, and permission can be displayed before USB connects.
+    func refreshInputPermission(restartListener: Bool = false) {
+        let previous = inputPermission
+        let current = environment.readInputPermission()
+        if current != previous { inputPermission = current }
+        if current != .granted {
+            keyboardEvents?.stop(); keyboardEvents = nil
+            if keyResponseEnabled { keyResponseEnabled = false; heldKeys.removeAll() }
+            if previous != current { inputStatus = current.message }
+        } else if connected && !busy && !keyResponseEnabled && (restartListener || previous != current) {
+            startKeyboardInput()
+        }
+    }
+    func openInputMonitoringSettings() {
+        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent")!)
+    }
     private func startKeyboardInput() {
+        inputPermission = environment.readInputPermission()
         keyboardEvents?.stop()
+        heldKeys.removeAll(); toggledKeys.removeAll()
         keyResponseEnabled = false
         guard environment.inputMonitoringEnabled else { keyboardEvents = nil; return }
-        let events = KeyboardEvents { [weak self] key in self?.keyPressed(key) }
+        let events = KeyboardEvents { [weak self] key, down in
+            if down { self?.keyPressed(key) } else { self?.keyReleased(key) }
+        }
         do {
             try events.start(registryID: attachedID)
             keyboardEvents = events; keyResponseEnabled = true; inputStatus = "Listening to GMK104 key presses"
@@ -301,12 +671,25 @@ final class ControllerModel: ObservableObject {
         }
     }
     func enableKeyboardInput() {
-        guard environment.inputMonitoringEnabled else { return }
-        _ = KeyboardEvents.requestPermission()
-        if connected { startKeyboardInput() }
-        if KeyboardEvents.permission != .granted {
-            inputStatus = "Allow GMK104 RGB Controller in System Settings → Privacy & Security → Input Monitoring, then click Enable key response again."
-        }
+        guard !busy else { return }
+        if environment.readInputPermission() != .granted { _ = environment.requestInputPermission() }
+        refreshInputPermission(restartListener: true)
+        if inputPermission != .granted {
+            inputStatus = "Enable GMK104 RGB Controller in System Settings → Privacy & Security → Input Monitoring. If macOS asks you to quit and reopen, do that first."
+        } else if !connected { inputStatus = "Input Monitoring is enabled. Connect the keyboard to start listening." }
+    }
+    func applySleepTime() {
+        guard connected, sleepSupported, !busy else { return }
+        let seconds = sleepAfterSeconds
+        run("Apply wireless sleep time", operation: { try $0.setSleepTime(seconds) }, success: {
+            self.appliedSleepSeconds = seconds
+            do {
+                let preferences = KeyboardPreferences(sleepSeconds: seconds)
+                try preferences.save(to: self.keyboardPreferencesURL)
+                self.keyboardPreferences = preferences
+                self.sleepStatus = "Verified on keyboard: \(KeyboardPreferences.label(seconds)). Saved on this Mac and reapplied after reconnect."
+            } catch { self.sleepStatus = "Sleep time changed on the keyboard, but could not be saved: \(error.localizedDescription)" }
+        })
     }
     func keyPressed(_ key: String) {
         guard connected else { return }
@@ -319,9 +702,36 @@ final class ControllerModel: ObservableObject {
             selectedMappingKey = key; completeQuickMapping(); return
         }
         guard playing else { return }
+        guard heldKeys.insert(key).inserted else { return }
+        if !toggledKeys.insert(key).inserted { toggledKeys.remove(key) }
         lastPressedKey = key
         pulses.append(KeyPulse(keyID: key, time: now))
         if pulses.count > 48 { pulses.removeFirst(pulses.count - 48) }
+    }
+    func keyReleased(_ key: String) { heldKeys.remove(key) }
+    private func previewKeyPress(_ key: String) {
+        guard playing else { return }
+        lastPressedKey = key
+        if !toggledKeys.insert(key).inserted { toggledKeys.remove(key) }
+        pulses.append(KeyPulse(keyID: key, time: now))
+        if pulses.count > 48 { pulses.removeFirst(pulses.count - 48) }
+        previewHeldKeys.insert(key)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in self?.previewHeldKeys.remove(key) }
+    }
+    /// Draft previews never send HID data or save a profile.
+    func previewDraftPulse(_ key: String) {
+        guard keys.contains(where: { $0.id == key }) else { return }
+        draftPulses.removeAll { now - $0.time > 18 }
+        draftPulses.append(KeyPulse(keyID: key, time: now))
+        if draftPulses.count > 32 { draftPulses.removeFirst(draftPulses.count - 32) }
+        draftHeldKeys.insert(key)
+        if draftToggledKeys.contains(key) { draftToggledKeys.remove(key) } else { draftToggledKeys.insert(key) }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in self?.draftHeldKeys.remove(key) }
+    }
+    func draftPreviewFrame() -> [RGB] {
+        guard let map else { return [RGB](repeating: .black, count: 104) }
+        return LayerRenderer.frame(layers: layers, keys: keys, mapping: map, pulses: pulses + draftPulses, time: now,
+                                   heldKeys: heldKeys.union(draftHeldKeys), toggledKeys: toggledKeys.union(draftToggledKeys), inputs: liveInputs)
     }
     func previewPulse() {
         let reactive = (activeLayers ?? []).filter { $0.enabled && $0.settings.effect.requiresKeyPresses && $0.opacity > 0 }
@@ -331,7 +741,7 @@ final class ControllerModel: ObservableObject {
                 map?.mappings.first(where: { $0.confirmed && layer.acceptsTrigger($0.keyId) })?.keyId else {
             status = "Choose at least one mapped trigger key in an active layer that responds to key presses."; return
         }
-        keyPressed(key)
+        previewKeyPress(key)
     }
     func startStudio() {
         guard !mappingMode else { status = "Leave key mapping before starting a lighting effect."; return }
@@ -368,6 +778,8 @@ final class ControllerModel: ObservableObject {
             }
             self.playingFPSLimit = frameRate
             self.activeLayers = selected; self.lastRendered = colors; self.pulses = []
+            self.heldKeys.removeAll(); self.toggledKeys.removeAll(); self.previewHeldKeys.removeAll()
+            self.lastAnimationSample = self.now
             self.playing = brightness > 0; self.generation += 1; self.lastAudit = self.now
             if self.playing {
                 self.startLightingInputs()
@@ -402,6 +814,7 @@ final class ControllerModel: ObservableObject {
     }
     func stopPlayback(savePausedState: Bool = true) {
         generation += 1; playing = false; frameTimer?.invalidate(); frameTimer = nil; pulses = []
+        heldKeys.removeAll(); toggledKeys.removeAll(); previewHeldKeys.removeAll()
         activeLayers = nil; measuredFPS = 0
         inputGeneration += 1; lightingInputSource?.stop(); lightingInputSource = nil; liveInputs = LightingInputs()
         if savePausedState, profile?.mode == .studio {
@@ -417,11 +830,18 @@ final class ControllerModel: ObservableObject {
     }
     private func animationTick() {
         guard playing && connected && !busy && !frameInFlight, let selected = activeLayers, let map else { return }
+        let sampleTime = now
+        if connectionName == "Bluetooth" {
+            let speed = selected.filter { $0.enabled && $0.settings.effect.requiresKeyPresses }.map { $0.settings.normalized.speed }.max() ?? 1
+            pulses = PulseTiming.adjusted(pulses, previous: lastAnimationSample, now: sampleTime, maximumStep: 0.1 / speed)
+        }
+        lastAnimationSample = sampleTime
         pulses.removeAll { now - $0.time > 20 }
-        let colors = LayerRenderer.frame(layers: selected, keys: keys, mapping: map, pulses: pulses, time: now, inputs: liveInputs)
+        let colors = LayerRenderer.frame(layers: selected, keys: keys, mapping: map, pulses: pulses,
+                                         time: now, heldKeys: heldKeys.union(previewHeldKeys), toggledKeys: toggledKeys, inputs: liveInputs)
         guard colors != lastRendered else { return }
         frameInFlight = true
-        let token = generation; let full = now - lastAudit > 2; let started = now
+        let token = generation; let full = connectionName != "Bluetooth" && now - lastAudit > 2; let started = now
         queue.async {
             do {
                 guard let c = self.client else { throw ControllerError.message("Keyboard disconnected.") }
@@ -478,7 +898,11 @@ final class ControllerModel: ObservableObject {
                 let overrides = c.indicatorOverrides
                 DispatchQueue.main.async {
                     self.state = s; self.frame = colors; self.busy = false
-                    self.brightness = s.brightness; self.effect = min(18, s.effect)
+                    if s.effect != 20 {
+                        self.onboardPreviewActive = false
+                        self.onboardPreviewLayerCount = 0
+                    }
+                    self.brightness = s.brightness; self.effect = s.effect == 20 ? 20 : min(18, s.effect)
                     self.updateIndicatorNotice(overrides)
                     self.status = "\(label) • Readback verified"; success?()
                 }
@@ -635,7 +1059,7 @@ final class ControllerModel: ObservableObject {
             status = illuminatedIndex == mappingIndex ? "Selected \(key.id) for LED \(mappingIndex). Click Save mapping." : "Light the LED first, then select its key and save."
             completeQuickMapping()
         } else if selectingLayerKeys { toggleLayerKey(key) }
-        else if playing { keyPressed(key.id) }
+        else if playing { previewKeyPress(key.id) }
         else if let mapping = map?.mappings.first(where: { $0.keyId == key.id }), mapping.confirmed, let index = mapping.ledIndex {
             let color = rgb
             run("Set \(key.id)", operation: { try $0.setLED(index, color: color) }, success: { self.rememberCurrentFrame() })
