@@ -84,7 +84,14 @@ final class MockBus {
         UInt32(p[at]) | UInt32(p[at + 1]) << 8 | UInt32(p[at + 2]) << 16 | UInt32(p[at + 3]) << 24
     }
     private static func uploadReply(_ op: UInt8, session: UInt32, offset: Int, crc: UInt32 = 0) -> [UInt8] {
-        [7, 3, 7, op] + OnboardUploader.magic + [1, 0] + le32(session) + le16(offset) + le32(crc) + [UInt8](repeating: 0, count: 12)
+        var reply: [UInt8] = [7, 3, 7, op]
+        reply.append(contentsOf: OnboardUploader.magic)
+        reply.append(contentsOf: [1, 0])
+        reply.append(contentsOf: le32(session))
+        reply.append(contentsOf: le16(offset))
+        reply.append(contentsOf: le32(crc))
+        reply.append(contentsOf: [UInt8](repeating: 0, count: 12))
+        return reply
     }
     func open() throws -> (transport: ReportTransport, registryID: UInt64?) {
         try locked {
