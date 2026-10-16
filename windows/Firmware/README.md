@@ -1,4 +1,6 @@
-# Firmware installer 1.0
+# Firmware installers: Windows 1.0.2 / macOS 1.0
+
+Download the [Windows 1.0.2 tool](https://github.com/danny67999/gmk104-lighting-studio/releases/tag/v1.0.2) in place of the older Windows flasher bundled with 1.0.
 
 The Mac and Windows installers ship the same five hash-pinned images: complete lighting firmware 1.0, legacy custom v0.2/v0.3/v0.4, and stock recovery. These legacy images were already included in published GitHub releases. The intermediate local test builds are not offered by either installer. See `firmware-catalog.json` at the repository root for exact hashes.
 
@@ -9,3 +11,5 @@ The complete 1.0 image is 174,372 bytes, CRC 7F2F4310, SHA-256 4BDC3E9729A0583F2
 Each flashing exchange may wait up to one minute. A separate overall deadline bounds the operation. If a transfer times out or loses its response, read its logs and check the keyboard's current state before another attempt. The tool does not automatically retry an uncertain flash. Never assume success just because progress reached the last block.
 
 Persistent storage is reverse engineered and checked by the firmware before committing. A failed boot can require hardware recovery. Neither application installation nor opening the firmware tool flashes anything automatically. The 1.0 release preparation runs offline tests and does not flash a physical keyboard.
+
+Windows uploader 1.0.2 uses a native transfer loop and the same 16 ms post-ACK settling interval as the Mac installer. Every packet still requires its existing acknowledgement, queue check, and 60-second response allowance. Logs now record elapsed time and the last acknowledged report; queue errors include the Windows error code. Firmware bytes are unchanged. A zero-byte response stops the upload; it does not trigger a reconnect, resend or activation. The observed stock-to-1.0 Parallels attempt stopped after 120.3 seconds at report 3495/3633. This is timing evidence, not proof of a specific firmware watchdog or a validated repair on hardware.

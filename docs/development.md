@@ -9,3 +9,5 @@ Both platforms encode the GMKP profile format, with byte fixtures checked by the
 `firmware-catalog.json` is the public package allowlist. `python3 scripts/verify-release-catalog.py` checks source image hashes and installer selections. Historical sources/images exist for regression and recognized installed identities; the packaged installer choices are deliberately limited to the five public images.
 
 See verification-1.0.md for tested behavior and limits. Hardware probing, flashing and permanent writes are separate explicit operations and are never part of CI.
+
+The Windows firmware launcher source is version 1.0.2. Its build embeds `gmk104-firmware.ico` as `Gmk104.FirmwareIcon`, so opening an EXE on a UNC share does not require shell icon extraction. `--self-test <output-folder>` constructs the window and runs all five firmware packet plans without opening HID. `windows/Firmware/Test-NativeTransport.ps1` runs injected transport failures and pacing checks offline; `Test-Firmware.ps1` invokes it in a separate process. See [1.0.2 verification](verification-1.0.2.md).

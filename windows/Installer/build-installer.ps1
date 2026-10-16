@@ -28,7 +28,7 @@ $pinsSource=Join-Path $artifacts 'FirmwareScriptPins.cs'
 $scriptHashes=@('GMK104-Guarded-Flasher.ps1','Run-Flasher.ps1') | ForEach-Object{(Get-FileHash -LiteralPath (Join-Path $firmwarePayload $_) -Algorithm SHA256).Hash.ToLowerInvariant()}
 ('internal static class FirmwareScriptPins { internal static readonly string[] Hashes = {"'+($scriptHashes -join '","')+'"}; }') | Set-Content -Encoding UTF8 -LiteralPath $pinsSource
 $flasher=Join-Path $payload 'GMK104 Firmware Flasher.exe'
-& $csc /nologo /target:winexe /platform:x64 /checked+ /optimize+ /r:System.dll /r:System.Core.dll /r:System.Drawing.dll /r:System.Windows.Forms.dll ('/win32icon:'+(Join-Path $icons 'gmk104-firmware.ico')) ('/out:'+$flasher) $pinsSource (Join-Path $PSScriptRoot 'FirmwareLauncher.cs')
+& $csc /nologo /target:winexe /platform:x64 /checked+ /optimize+ /r:System.dll /r:System.Core.dll /r:System.Drawing.dll /r:System.Windows.Forms.dll ('/win32icon:'+(Join-Path $icons 'gmk104-firmware.ico')) ('/resource:'+(Join-Path $icons 'gmk104-firmware.ico')+',Gmk104.FirmwareIcon') ('/out:'+$flasher) $pinsSource (Join-Path $PSScriptRoot 'FirmwareLauncher.cs')
 if($LASTEXITCODE-ne 0){throw 'Firmware EXE compilation failed'}
 $selfTestRoot=Join-Path $artifacts ('flasher-tests-'+[Guid]::NewGuid().ToString('N'))
 $test=Start-Process -FilePath $flasher -ArgumentList @('--self-test',('"'+$selfTestRoot+'"')) -WindowStyle Hidden -PassThru -Wait

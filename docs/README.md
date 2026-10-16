@@ -7,6 +7,7 @@ Per-key RGB for Windows and macOS, with sixteen layers, on-keyboard playback and
 - [Troubleshooting](troubleshooting.md)
 - [Firmware installation and catalog](firmware-safety.md)
 - [Build and tests](development.md)
-- [Release verification](verification-1.0.md)
+- [Release 1.0 verification](verification-1.0.md)
+- [Windows firmware uploader 1.0.2 verification](verification-1.0.2.md)
 
 [Download 1.0](https://github.com/danny67999/gmk104-lighting-studio/releases/tag/v1.0). Lighting control supports compatible USB, Bluetooth and 2.4 GHz interfaces. Firmware installation and profile uploads require wired USB. Wireless hardware behavior varies; offline tests alone do not verify it.

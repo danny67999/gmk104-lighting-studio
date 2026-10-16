@@ -52,3 +52,6 @@ $blank[42]=0;Assert-Check (-not(Test-StorageReservation $blank)) 'Foreign storag
 Assert-Check (Test-StorageReservation $blank) 'Exact owned reservation rejected'
 $blank[3968]=0;Assert-Check (-not(Test-StorageReservation $blank)) 'Foreign marker accepted'
 Write-Output 'READ-ONLY STORAGE RESERVATION TESTS PASS'
+
+& (Join-Path $PSHOME 'powershell.exe') -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'Test-NativeTransport.ps1')
+if($LASTEXITCODE -ne 0){throw 'Native firmware transport regression checks failed'}

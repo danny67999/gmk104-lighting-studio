@@ -67,6 +67,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
+using IO=System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
@@ -191,11 +192,11 @@ public static class Gmk104WindowsFirmwareHid {
         return list;
     }
 
-    public sealed class Session : IDisposable {
+    public sealed class Session : IDisposable, IFirmwareSession {
         SafeFileHandle handle; FileStream stream; int inputLength, outputLength;
-        readonly Stopwatch pacing=Stopwatch.StartNew(); long earliest; int afterReply; bool faulted;
+        readonly ReportPacer pacing; bool faulted;
         public Session(string path,int input,int output,bool exclusive) {
-            afterReply=exclusive?24:0;
+            pacing=new ReportPacer(exclusive);
             inputLength=input; outputLength=output; handle=Open(path,exclusive);
             if(handle.IsInvalid) { int e=Marshal.GetLastWin32Error(); handle.Dispose();
                 throw new Win32Exception(e, exclusive ?
@@ -207,23 +208,26 @@ public static class Gmk104WindowsFirmwareHid {
         static void Observe(Task t) { if(t==null)return; try { if(!t.IsCompleted)Task.WaitAny(new Task[]{t},2000);
             if(t.IsCompleted)t.GetAwaiter().GetResult(); } catch {} }
         void Cancel(Task r,Task w) { try{CancelIoEx(handle,IntPtr.Zero);}catch{} Observe(w); Observe(r); }
-        public void FlushInputQueue() { if(!HidD_FlushQueue(handle))
-            throw new Win32Exception(Marshal.GetLastWin32Error(),"Could not clear the GMK104 input queue."); }
+        public void FlushInputQueue() {
+            if(!HidD_FlushQueue(handle)) {
+                int code=Marshal.GetLastWin32Error();
+                throw new Win32Exception(code,String.Format("Could not clear the GMK104 input queue. Windows error {0}: {1}",code,new Win32Exception(code).Message));
+            }
+        }
         public byte[] Exchange(byte[] report,int timeout,bool flushFirst) {
             if(faulted)throw new IOException("This firmware connection is faulted. Automatic retries are prohibited.");
             if(report==null||report.Length!=outputLength)throw new ArgumentException("Output report length mismatch.");
-            int delay=(int)Math.Max(0,earliest-pacing.ElapsedMilliseconds); if(delay>0)System.Threading.Thread.Sleep(delay);
-            if(flushFirst)FlushInputQueue(); var response=new byte[inputLength];
+            pacing.Wait(); var response=new byte[inputLength];
             Task<int> r=null; Task w=null; var timer=Stopwatch.StartNew();
             try {
-                earliest=pacing.ElapsedMilliseconds+16;
+                if(flushFirst)FlushInputQueue(); pacing.Sent();
                 r=stream.ReadAsync(response,0,response.Length); w=stream.WriteAsync(report,0,report.Length);
                 if(!Wait(w,timeout))throw new TimeoutException("Timed out writing a GMK104 HID report.");
                 w.GetAwaiter().GetResult(); int left=timeout-(int)timer.ElapsedMilliseconds;
                 if(!Wait(r,left))throw new TimeoutException("Timed out waiting for a GMK104 HID response.");
                 int count=r.GetAwaiter().GetResult();
                 if(count!=inputLength)throw new IOException(String.Format("Short HID response: {0}/{1} bytes.",count,inputLength));
-                earliest=Math.Max(earliest,pacing.ElapsedMilliseconds+afterReply);
+                pacing.Acknowledged();
                 return response;
             } catch { faulted=true; Cancel(r,w); throw; } finally { timer.Stop(); }
         }
@@ -240,6 +244,63 @@ public static class Gmk104WindowsFirmwareHid {
         using(var s=new Session(d.Path,d.Caps.InputReportByteLength,d.Caps.OutputReportByteLength,false))
             return s.Exchange(q,timeout,true);
     }
+        public interface IFirmwareSession { byte[] Exchange(byte[] report,int timeout,bool flushFirst); }
+    public sealed class ReportPacer {
+        readonly Stopwatch clock=Stopwatch.StartNew(); long earliest; readonly int afterReply;
+        public ReportPacer(bool exclusive) { afterReply=exclusive?16:0; }
+        public void Wait() {
+            long remaining;
+            while((remaining=earliest-clock.ElapsedMilliseconds)>0) {
+                if(remaining>2)System.Threading.Thread.Sleep((int)remaining-2);
+                else System.Threading.Thread.SpinWait(100);
+            }
+        }
+        public void Sent() { earliest=clock.ElapsedMilliseconds+16; }
+        public void Acknowledged() { earliest=Math.Max(earliest,clock.ElapsedMilliseconds+afterReply); }
+    }
+    public sealed class TransferResult {
+        public byte[] FinalResponse; public string EndError,LogError; public int Acknowledged;
+        public double ElapsedSeconds;
+    }
+    sealed class TransferLog {
+        readonly IO.StreamWriter writer; readonly Stopwatch clock; public string Error;
+        public TransferLog(IO.StreamWriter w,Stopwatch c) { writer=w;clock=c; }
+        public void Write(string text) {
+            if(writer==null||Error!=null)return;
+            try { writer.WriteLine("{0:o} elapsedMs={1} {2}",DateTime.UtcNow,clock.ElapsedMilliseconds,text); }
+            catch(Exception e) { Error=e.Message; }
+        }
+    }
+    public static TransferResult Transfer(IFirmwareSession session,byte[] start,byte[][] reports,byte[] end,IO.StreamWriter writer,int deadlineMinutes) {
+        if(session==null||reports==null||reports.Length==0||start==null||start.Length!=64||end==null||end.Length!=64||deadlineMinutes<1)throw new ArgumentException("Invalid prepared firmware transfer.");
+        foreach(var report in reports)if(report==null||report.Length!=64)throw new ArgumentException("Invalid prepared firmware data report.");
+        var timer=Stopwatch.StartNew();var log=new TransferLog(writer,timer);var result=new TransferResult();string stage="OTA START";
+        try {
+            log.Write("START SEND"); ValidateAck(session.Exchange(start,60000,true),stage);log.Write("START ACK");
+            for(int i=0;i<reports.Length;i++) {
+                stage=String.Format("Data report {0}/{1}",i+1,reports.Length);
+                if(timer.Elapsed.TotalMinutes>=deadlineMinutes)throw new TimeoutException("Overall firmware transfer deadline exceeded.");
+                log.Write(String.Format("DATA SEND report={0}/{1}",i+1,reports.Length));
+                ValidateAck(session.Exchange(reports[i],60000,true),stage);result.Acknowledged=i+1;
+                log.Write(String.Format("DATA ACK report={0}/{1}",i+1,reports.Length));
+                if((i+1)%50==0||i+1==reports.Length)Console.WriteLine("  {0}% ({1}/{2} reports acknowledged, {3:F1}s elapsed)",100*(i+1)/reports.Length,i+1,reports.Length,timer.Elapsed.TotalSeconds);
+            }
+            stage="OTA END";
+            if(timer.Elapsed.TotalMinutes>=deadlineMinutes)throw new TimeoutException("Overall firmware deadline exceeded before activation.");
+            log.Write("END SEND");
+            try { result.FinalResponse=session.Exchange(end,60000,true);log.Write("END RESPONSE RECEIVED"); }
+            catch(Exception e) { result.EndError=e.Message;log.Write("END RESPONSE ERROR: "+e.Message); }
+            result.ElapsedSeconds=timer.Elapsed.TotalSeconds;result.LogError=log.Error;return result;
+        } catch(Exception e) {
+            string message=String.Format("{0} failed after {1:F3}s; last successful data ACK {2}/{3}. {4}",stage,timer.Elapsed.TotalSeconds,result.Acknowledged,reports.Length,e.Message);
+            log.Write("ERROR: "+message);throw new IOException(message,e);
+        }
+    }
+    static void ValidateAck(byte[] response,string stage) {
+        if(response==null||response.Length!=64||response[0]!=5||response[1]!=2)throw new IOException(stage+" returned an invalid OTA acknowledgment.");
+        if(response[2]==3&&response[3]==0&&response[4]==6&&response[5]==255)throw new IOException(stage+" returned an unexpected final-status frame.");
+    }
+
     public static void BeginPowerHold() { if(SetThreadExecutionState(ES_CONTINUOUS|ES_SYSTEM_REQUIRED)==0)
         throw new Win32Exception(Marshal.GetLastWin32Error(),"Windows refused to prevent sleep."); }
     public static void EndPowerHold() { SetThreadExecutionState(ES_CONTINUOUS); }
@@ -643,23 +704,13 @@ try {
         Write-Warning 'FLASH STARTING. Keep the USB cable and computer power connected.'
         Write-Output "  Durable flash log: $logPath"
 
-        Write-FlashLog $logWriter 'START SEND';$transferStarted=$true;$script:FlashLogRequired=$false
-        $ack=$session.Exchange($plan.Start,60000,$true);Test-OtaIntermediateAck $ack 'OTA START';Write-FlashLog $logWriter 'START ACK'
-        for($i=0;$i-lt$plan.DataReports.Count;$i++){
-            if($deadline.Elapsed.TotalMinutes-ge$FlashDeadlineMinutes){throw "Overall $FlashDeadlineMinutes-minute flash deadline exceeded."}
-            $first=$i*3;$last=[Math]::Min($first+2,$plan.ChunkCount-1)
-            Write-FlashLog $logWriter ('DATA SEND report={0}/{1} chunks={2}-{3}' -f ($i+1),$plan.DataReports.Count,$first,$last)
-            $ack=$session.Exchange($plan.DataReports[$i],60000,$true);Test-OtaIntermediateAck $ack ("Data report $($i+1)")
-            Write-FlashLog $logWriter ('DATA ACK report={0}/{1}' -f ($i+1),$plan.DataReports.Count)
-            if((($i+1)%50)-eq 0-or($i+1)-eq$plan.DataReports.Count){
-                $pct=[int](100*($i+1)/$plan.DataReports.Count);Write-Progress -Activity "Flashing GMK104 $Target" -Status "$pct%" -PercentComplete $pct
-                Write-Output ('  {0}% ({1}/{2} reports acknowledged)' -f $pct,($i+1),$plan.DataReports.Count)
-            }
-        }
-        if($deadline.Elapsed.TotalMinutes-ge$FlashDeadlineMinutes){throw 'Flash deadline exceeded before OTA END.'}
-        Write-FlashLog $logWriter 'END SEND'
-        try{$finalResponse=$session.Exchange($plan.End,60000,$true);Write-FlashLog $logWriter 'END RESPONSE RECEIVED'}
-        catch{$endError=$_.Exception.Message;Write-FlashLog $logWriter "END RESPONSE ERROR: $endError"}
+        Write-FlashLog $logWriter 'TRANSPORT uploader=1.0.2 min-send=16ms post-ack=16ms engine=native reply-timeout=60000ms'
+        $transferStarted=$true;$script:FlashLogRequired=$false
+        [byte[][]]$preparedReports=$plan.DataReports.ToArray()
+        $nativeResult=[Gmk104WindowsFirmwareHid]::Transfer($session,$plan.Start,$preparedReports,$plan.End,$logWriter,$FlashDeadlineMinutes)
+        $finalResponse=$nativeResult.FinalResponse;$endError=$nativeResult.EndError
+        if($nativeResult.LogError){$script:FlashLogFault=$nativeResult.LogError}
+
     }
     catch {
         try{Write-FlashLog $logWriter "ERROR: $($_.Exception.Message)"}catch{}

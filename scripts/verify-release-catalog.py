@@ -21,7 +21,10 @@ windows = (root / 'windows/Installer/FirmwareLauncher.cs').read_text()
 assert re.findall(r'"(GMK104[^"\n]+\.bin)"', windows) == list(expected)
 flasher = (root / 'windows/Firmware/GMK104-Guarded-Flasher.ps1').read_text()
 assert "[ValidateSet('Release','Custom','Wireless','Streaming','Stock')]" in flasher
-assert flasher.count('Exchange($plan.Start,60000') == 1
-assert flasher.count('Exchange($plan.DataReports[$i],60000') == 1
-assert flasher.count('Exchange($plan.End,60000') == 1
+assert flasher.count('Exchange(start,60000,true)') == 1
+assert flasher.count('Exchange(reports[i],60000,true)') == 1
+assert flasher.count('Exchange(end,60000,true)') == 1
 print('PASS: both installers select the five published firmware images; hashes and one-minute exchange waits match')
+
+assert 'afterReply=exclusive?16:0;' in flasher
+assert '::Transfer($session,$plan.Start,$preparedReports,$plan.End,$logWriter,$FlashDeadlineMinutes)' in flasher

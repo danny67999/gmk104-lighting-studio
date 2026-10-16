@@ -8,10 +8,10 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
-[assembly: AssemblyTitle("GMK104 Guarded Firmware Flasher")]
-[assembly: AssemblyProduct("GMK104 Guarded Firmware Flasher")]
-[assembly: AssemblyVersion("1.0.0.0")]
-[assembly: AssemblyFileVersion("1.0.0.0")]
+[assembly: AssemblyTitle("GMK104 Guarded Firmware Flasher 1.0.2")]
+[assembly: AssemblyProduct("GMK104 Guarded Firmware Flasher 1.0.2")]
+[assembly: AssemblyVersion("1.0.2.0")]
+[assembly: AssemblyFileVersion("1.0.2.0")]
 internal sealed class FirmwareLauncher : Form
 {
     private static readonly string[] Targets={"Release","Custom","Wireless","Streaming","Stock"};
@@ -49,6 +49,11 @@ internal sealed class FirmwareLauncher : Form
             if(args.Length!=2||args[0]!="--self-test")return 2;
             try
             {
+                using(var window=new FirmwareLauncher())
+                {
+                    if(window.Icon==null||!window.Text.Contains("1.0.2"))throw new InvalidOperationException("Installer window failed offline startup validation");
+                    if(window.flash.Enabled)throw new InvalidOperationException("Flash must be disabled at startup");
+                }
                 string session=Extract(Path.GetFullPath(args[1]));
                 foreach(string chosen in Targets)using(var p=Process.Start(StartInfo(session,"DryRun",chosen,"",true)))
                 {
@@ -63,10 +68,22 @@ internal sealed class FirmwareLauncher : Form
         }
         Application.EnableVisualStyles();Application.SetCompatibleTextRenderingDefault(false);Application.Run(new FirmwareLauncher());return 0;
     }
+    private static Icon LoadWindowIcon()
+    {
+        // ExtractAssociatedIcon rejects UNC paths such as Parallels \Mac shares.
+        // Read the embedded icon without asking the shell to resolve the EXE path.
+        try
+        {
+            using(var stream=typeof(FirmwareLauncher).Assembly.GetManifestResourceStream("Gmk104.FirmwareIcon"))
+                if(stream!=null)using(var icon=new Icon(stream))return (Icon)icon.Clone();
+        }
+        catch { /* A cosmetic icon failure must not prevent startup. */ }
+        return (Icon)SystemIcons.Application.Clone();
+    }
     private FirmwareLauncher()
     {
-        Text="GMK104 • Guarded Firmware Flasher";ClientSize=new Size(800,610);MinimumSize=new Size(800,650);StartPosition=FormStartPosition.CenterScreen;
-        Font=new Font("Segoe UI",10);BackColor=Color.FromArgb(19,24,31);ForeColor=Color.FromArgb(235,240,247);Icon=Icon.ExtractAssociatedIcon(Application.ExecutablePath);
+        Text="GMK104 • Guarded Firmware Flasher 1.0.2";ClientSize=new Size(800,610);MinimumSize=new Size(800,650);StartPosition=FormStartPosition.CenterScreen;
+        Font=new Font("Segoe UI",10);BackColor=Color.FromArgb(19,24,31);ForeColor=Color.FromArgb(235,240,247);Icon=LoadWindowIcon();
         panel=new FlowLayoutPanel{Dock=DockStyle.Fill,FlowDirection=FlowDirection.TopDown,WrapContents=false,AutoScroll=true,Padding=new Padding(22)};Controls.Add(panel);
         AddLabel("GMK104  /  FIRMWARE",40,18);
         AddLabel("WIRED USB ONLY • Persistent lighting and guarded rollback",32,11);
