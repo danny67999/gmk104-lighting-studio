@@ -18,7 +18,7 @@ The Windows portable ZIP includes both apps too. Separate Mac app ZIPs, standalo
 - Per-key RGB, up to **16 lighting layers**, independent effect speed, key masks and **Affect all keys**.
 - On-keyboard effects and saved profiles that resume after unplugging, with compatible firmware.
 - Windows now includes the improved sidebar workspace, visual effect cards, inline layer editor, stable playback controls and theme-aware key selection.
-- Windows Firmware Flasher fixes the startup crash on shared network folders, including Parallels’ shared Mac folders. Its native transfer loop reduces PowerShell overhead and uses the Mac uploader’s 16 ms post-acknowledgement settling interval.
+- Windows Firmware Flasher fixes the startup crash on shared network folders. Its native transfer loop reduces PowerShell overhead and uses the Mac uploader’s 16 ms post-acknowledgement settling interval.
 - Transfer errors include elapsed time, the last acknowledged packet and native Windows queue details. Strict acknowledgements, one-minute waits per USB exchange and no automatic retry after uncertain transfers remain.
 - Five eight-layer profiles: Neon Circuit, Matrix Overdrive, Crystal Storm, Solar Forge and Prism Arcade.
 
@@ -30,4 +30,4 @@ Use wired USB to flash firmware or upload/save profiles. Windows requires .NET F
 
 Offline renderer/profile/transport suites, all five firmware image plans and native transfer failure checks are required for this release. Packaging checks verify that complete Windows Setup/portable downloads contain both apps and the corrected firmware tools, and the Mac DMG contains both 1.0.2 apps.
 
-The startup fix was visibly verified in Parallels. The upload-pacing change still needs confirmation through a completed physical flash; offline tests do not establish compatibility with every hardware revision. A failed boot can require hardware recovery. See [verification details](https://github.com/danny67999/gmk104-lighting-studio/blob/main/docs/verification-1.0.2.md).
+The startup fix was verified on Windows. The upload-pacing change still needs confirmation through a completed physical flash; offline tests do not establish compatibility with every hardware revision. A failed boot can require hardware recovery. See [verification details](https://github.com/danny67999/gmk104-lighting-studio/blob/main/docs/verification-1.0.2.md).

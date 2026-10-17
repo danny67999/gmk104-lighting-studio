@@ -70,7 +70,7 @@ internal sealed class FirmwareLauncher : Form
     }
     private static Icon LoadWindowIcon()
     {
-        // ExtractAssociatedIcon rejects UNC paths such as Parallels \Mac shares.
+        // ExtractAssociatedIcon rejects UNC paths, including shared network folders.
         // Read the embedded icon without asking the shell to resolve the EXE path.
         try
         {

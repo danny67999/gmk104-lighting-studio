@@ -10,8 +10,8 @@ The release includes Lighting Studio and firmware tools together for Windows and
 - All five image/stream plans passed; 103 firmware regression assertions passed.
 - 32,774 injected native transport assertions passed, including failure positions 2560/3495, short replies, packet order, acknowledgement gating and no END after uncertain data.
 - Read-only storage reservation checks passed.
-- Packaged `--self-test` constructed the GUI and checked all five plans from a local Windows path and the exact Parallels UNC share that previously crashed. No HID was opened by these tests.
-- The window was then visibly opened in Parallels Windows 11 from the shared Mac folder, showing Ready and no device operation run. The user confirmed that the build opens.
+- Packaged `--self-test` constructed the GUI and checked all five plans from a local Windows path and the shared network path that previously crashed. No HID was opened by these tests.
+- The window was then visibly opened on Windows 11 from the shared network folder, showing Ready and no device operation run. The user confirmed that the build opens.
 
 A previous stock-to-1.0 upload disconnected after 120.322 seconds, at report 3495 of 3633 (last acknowledgement 3494). The reporter’s separate failure at packet 2560 has not been reproduced on that reporter’s hardware. Neither observation proves a specific firmware watchdog or a hardware-revision mismatch. Native pacing-only measurements exclude device I/O and are not a flash-duration or success measurement.
 
