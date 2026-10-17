@@ -1,6 +1,6 @@
-# Firmware installers: Windows 1.0.2 / macOS 1.0
+# Firmware Installer 1.0.2 (Complete Lighting firmware 1.0)
 
-Download the [Windows 1.0.2 tool](https://github.com/danny67999/gmk104-lighting-studio/releases/tag/v1.0.2) in place of the older Windows flasher bundled with 1.0.
+The [complete 1.0.2 release](https://github.com/danny67999/gmk104-lighting-studio/releases/tag/v1.0.2) includes Lighting Studio and the firmware installer together for Windows and macOS. The standalone firmware tools are optional.
 
 The Mac and Windows installers ship the same five hash-pinned images: complete lighting firmware 1.0, legacy custom v0.2/v0.3/v0.4, and stock recovery. These legacy images were already included in published GitHub releases. The intermediate local test builds are not offered by either installer. See `firmware-catalog.json` at the repository root for exact hashes.
 

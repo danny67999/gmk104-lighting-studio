@@ -19,3 +19,14 @@ jobs:
         run: |
           codesign --verify --deep --strict 'outputs/GMK104 RGB Controller.app'
           codesign --verify --deep --strict 'outputs/GMK104 Firmware Installer.app'
+      - name: Package both Mac apps together
+        run: ./mac/package.sh
+      - name: Save complete Mac release packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-release-1.0.2
+          if-no-files-found: error
+          path: |
+            outputs/GMK104-Lighting-Studio-1.0.2-macOS-arm64.dmg
+            outputs/GMK104-Lighting-Studio-1.0.2-macOS-arm64.zip
+            outputs/GMK104-Firmware-Installer-1.0.2-macOS-arm64.zip

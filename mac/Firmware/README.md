@@ -1,4 +1,4 @@
-# Firmware installer 1.0
+# Firmware Installer 1.0.2 (Complete Lighting firmware 1.0)
 
 The Mac and Windows installers ship the same five hash-pinned images: complete lighting firmware 1.0, legacy custom v0.2/v0.3/v0.4, and stock recovery. These legacy images were already included in published GitHub releases. The intermediate local test builds are not offered by either installer. See `firmware-catalog.json` at the repository root for exact hashes.
 

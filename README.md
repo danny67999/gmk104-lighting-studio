@@ -1,18 +1,17 @@
-# GMK104 Lighting Studio 1.0 — per-key RGB for Windows and macOS
+# GMK104 Lighting Studio 1.0.2 — per-key RGB for Windows and macOS
 
 Give every key on the ZUOYA GMK104 its own color, combine up to **16 lighting layers**, and save the effects to the keyboard so they run without the app and return after unplugging it. Compatible custom firmware is required; installing the desktop app alone does not add per-key RGB to stock firmware.
 
-## Downloads
+## Download 1.0.2
 
-Get Lighting Studio and the Mac apps from the **[1.0 release](https://github.com/danny67999/gmk104-lighting-studio/releases/tag/v1.0)**. For Windows firmware installation, use **[Firmware Installer 1.0.2](https://github.com/danny67999/gmk104-lighting-studio/releases/tag/v1.0.2)** in place of the older flasher bundled with 1.0. It fixes opening from shared network folders and updates upload pacing; the keyboard firmware remains 1.0.
+Get everything from the **[complete 1.0.2 release](https://github.com/danny67999/gmk104-lighting-studio/releases/tag/v1.0.2)**. Each recommended download includes **Lighting Studio and the firmware installer**; you do not need another release.
 
 | Platform | Recommended download | Requirements |
 | --- | --- | --- |
-| Windows | `GMK104-Lighting-Studio-Windows-Setup-1.0.exe` — installs Lighting Studio and Firmware Flasher | Windows 10/11 x64, .NET Framework 4.8 |
-| Windows firmware tool | `GMK104-Firmware-Installer-1.0.2-Windows-x64.zip` — extract all files, then open `GMK104 Firmware Flasher.exe` | Windows 10/11 x64, .NET Framework 4.8 |
-| macOS | `GMK104-Lighting-Studio-1.0-macOS-arm64.dmg` — drag both apps into Applications | Apple Silicon, macOS 13 or later |
+| Windows | `GMK104-Lighting-Studio-Windows-Setup-1.0.2.exe` — installs both apps | Windows 10/11 x64, .NET Framework 4.8 |
+| macOS | `GMK104-Lighting-Studio-1.0.2-macOS-arm64.dmg` — drag both apps into Applications | Apple Silicon, macOS 13 or later |
 
-Portable Windows packages, separate Mac app ZIPs, the standalone firmware image, five complex profiles and checksums are also included. Keep the Windows portable app beside its bundled resources and `Firmware` folder.
+The same release also includes the complete Windows portable ZIP, optional standalone app/firmware-tool downloads, the firmware image, five complex profiles and checksums. Keep Windows portable files together. The 1.0.2 desktop apps use the unchanged Complete Lighting **firmware 1.0**, CRC `7F2F4310`.
 
 ## Start here
 

@@ -33,13 +33,13 @@ namespace Gmk104LightingStudio
         protected override void OnMouseClick(MouseEventArgs e)
         {
             base.OnMouseClick(e);
-            if (SelectionEnabled) return;
+            if (SelectionEnabled && (ModifierKeys & System.Windows.Forms.Keys.Control) == 0) return;
             foreach (KeyGeometry key in Keys) if (BoundsFor(key).Contains(e.Location)) { if (KeyClicked != null) KeyClicked(key.id); break; }
         }
         protected override void OnMouseDown(MouseEventArgs e)
         {
             base.OnMouseDown(e);
-            if (!SelectionEnabled || e.Button != MouseButtons.Left) return;
+            if (!SelectionEnabled || e.Button != MouseButtons.Left || (ModifierKeys & System.Windows.Forms.Keys.Control) != 0) return;
             Focus(); dragging = true; dragStart = previousPoint = e.Location; dragModifiers = ModifierKeys;
             original = Selection == null ? new HashSet<string>(Keys.Select(k => k.id)) : new HashSet<string>(Selection);
             painted = new HashSet<string>();
@@ -90,21 +90,23 @@ namespace Gmk104LightingStudio
             {
                 var m = Mapping == null ? null : Mapping.mappings.FirstOrDefault(x => x.keyId == key.id);
                 bool known = m != null && m.confirmed && m.ledIndex.HasValue;
-                RGB rgb = known && Frame != null && Frame.Length == 104 ? Frame[m.ledIndex.Value] : new RGB(49, 127, 110);
+                RGB rgb = known && Frame != null && Frame.Length == 104 ? Frame[m.ledIndex.Value] : new RGB(0, 0, 0);
                 Color color = Color.FromArgb(rgb.r, rgb.g, rgb.b);
                 bool selected = Selection != null && Selection.Contains(key.id);
                 var rect = BoundsFor(key);
                 using (var shape = Rounded(rect, 5))
-                using (var fill = new SolidBrush(Color.FromArgb(26 + rgb.r / 6, 30 + rgb.g / 6, 35 + rgb.b / 6)))
-                using (var border = new Pen(selected ? SystemColors.Highlight : known ? color : Color.FromArgb(55, 60, 69), selected ? 1.5f : 1))
+                using (var fill = new SolidBrush(Color.FromArgb(Math.Min(255, (StudioTheme.Dark ? 38 : 226) + rgb.r / (StudioTheme.Dark ? 4 : 9)), Math.Min(255, (StudioTheme.Dark ? 38 : 226) + rgb.g / (StudioTheme.Dark ? 4 : 9)), Math.Min(255, (StudioTheme.Dark ? 40 : 230) + rgb.b / (StudioTheme.Dark ? 4 : 10)))))
+                using (var border = new Pen(selected ? SystemColors.Highlight : known && (rgb.r + rgb.g + rgb.b > 25) ? color : StudioTheme.Border, selected ? 1.5f : 1))
                 {
                     e.Graphics.FillPath(fill, shape); e.Graphics.DrawPath(border, shape);
                     if (selected) using (var tint = new SolidBrush(Color.FromArgb(34, SystemColors.Highlight))) e.Graphics.FillPath(tint, shape);
                 }
-                string label = key.label.Replace("\n", " ");
+                string label = key.label.Contains("\n") ? (key.id.StartsWith("Numpad") || key.id == "NumLock" ? key.label.Split('\n').First() : key.label.Split('\n').Last()) : key.label;
                 if (ShowIndices && known) label += "\n" + m.ledIndex.Value;
                 var flags = TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.WordBreak | TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix;
-                TextRenderer.DrawText(e.Graphics, label, Font, Rectangle.Round(rect), Selection != null && !selected ? Color.FromArgb(124, 135, 145) : Color.FromArgb(237, 242, 247), flags);
+                var measure = TextRenderer.MeasureText(label, Font, Size.Empty, TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix);
+                float fontSize = Math.Max(5.5f, Font.Size * Math.Min(1, (rect.Width - 2) / Math.Max(1, measure.Width)));
+                using (var keyFont = new Font(Font.FontFamily, fontSize)) TextRenderer.DrawText(e.Graphics, label, keyFont, Rectangle.Round(rect), Selection != null && !selected ? StudioTheme.Secondary : StudioTheme.Text, flags);
             }
             if (dragging && marquee && !selectionRect.IsEmpty)
                 using (var tint = new SolidBrush(Color.FromArgb(26, SystemColors.Highlight)))

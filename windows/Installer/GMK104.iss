@@ -4,7 +4,9 @@
 #ifndef ArtifactDir
   #error ArtifactDir is required
 #endif
-#define ProductVersion "1.0.0"
+#ifndef ProductVersion
+#define ProductVersion "1.0.2"
+#endif
 [Setup]
 #ifdef SmokeTest
 AppId={{8057B21A-7C40-4F0F-A56D-14BFCA2CC104}

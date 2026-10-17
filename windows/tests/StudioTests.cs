@@ -27,7 +27,7 @@ namespace Gmk104LightingStudio
         private static StudioForm NewForm()
         {
             var form = new StudioForm(true);
-            foreach (string field in new[] { "animation", "reconnect", "sensors" }) Get<Timer>(form, field).Stop();
+            foreach (string field in new[] { "animation", "reconnect", "sensors", "previewTimer" }) Get<Timer>(form, field).Stop();
             return form;
         }
         private static void DisposeForm(StudioForm form)
@@ -62,6 +62,43 @@ namespace Gmk104LightingStudio
                 typeof(Form).GetMethod("OnShown", Private).Invoke(form, new object[] { EventArgs.Empty });
                 Check(Get<RGBClient>(form, "client") == null && !Get<bool>(form, "busy") && !Get<bool>(form, "retryWanted"), "explicit connect and Shown remain offline in preview");
 
+                form.Show(); Application.DoEvents();
+                Check(Get<Panel>(form, "workspace").Visible && !Get<Panel>(form, "gallery").Visible, "My Lighting is the default visible workspace");
+                Check(Get<StudioButton[]>(form, "navigation").Length == 3 && !form.Controls.OfType<TabControl>().Any(), "three sidebar destinations replace legacy tabs");
+                Call(form, "Navigate", 1); Application.DoEvents();
+                Check(Get<FlowLayoutPanel>(form, "galleryCards").Visible && Get<FlowLayoutPanel>(form, "galleryCards").Controls.Count >= 27, "effect gallery exposes visual cards");
+                Call(form, "RenderPreviews");
+                Get<TextBox>(form, "searchBox").Text = "rainbow ripple";
+                Check(Get<FlowLayoutPanel>(form, "galleryCards").Controls.Count == 1, "effect gallery search filters to matching card");
+                Get<TextBox>(form, "searchBox").Text = "";
+                Call(form, "Navigate", 2); Application.DoEvents();
+                Check(Get<Panel>(form, "settingsPage").Visible && Get<Label>(form, "inputLabel").Visible, "Keyboard visibly shows PC key-response status");
+                Set(form, "busy", true); Call(form, "UpdateControls");
+                Set(form, "busy", false); Call(form, "UpdateControls"); Application.DoEvents();
+                Check(Get<Panel>(form, "settingsPage").Visible && Get<Button>(form, "saveKeyboardButton").Visible && Get<Button>(form, "playKeyboardButton").Visible, "checking work never removes settings or playback controls");
+                Call(form, "Navigate", 0); Application.DoEvents();
+                Check(Get<Panel>(form, "editorPanel").Visible && Get<CheckBox>(form, "affectAll").Visible, "selected effect edits inline with visible Affect all keys");
+                using (var dialog = (Form)Call(form, "CreatePCPlaybackDialog"))
+                {
+                    dialog.Show(); Application.DoEvents();
+                    Check(dialog.ControlBox && dialog.CancelButton is Button && ((Button)dialog.CancelButton).Text == "Close", "PC playback has both title-bar X and visible Close");
+                    dialog.Close();
+                }
+                foreach (var size in new[] { new System.Drawing.Size(1080, 700), new System.Drawing.Size(1320, 880), new System.Drawing.Size(1920, 1080) })
+                {
+                    form.Size = size; Application.DoEvents();
+                    var save = Get<Button>(form, "saveKeyboardButton"); var play = Get<Button>(form, "playKeyboardButton");
+                    var inline = Get<Panel>(form, "editorPanel"); var boardView = Get<KeyboardView>(form, "keyboard");
+                    Check(boardView.Parent == Get<Panel>(form, "keyboardHost") && inline.Visible, "keyboard and inline editor remain in workspace at " + size);
+                    var bounds = form.RectangleToClient(save.RectangleToScreen(save.ClientRectangle));
+                    Check(bounds.Left >= 200 && bounds.Right <= form.ClientSize.Width && bounds.Bottom <= form.ClientSize.Height && save.Visible && play.Visible, "fixed keyboard actions fit " + size);
+                }
+                form.Size = new System.Drawing.Size(1320, 880); Application.DoEvents();
+
+                string originalId = draft.layers[0].id;
+                Call(form, "AddEffect", "spacedMatrixRain");
+                Check(Get<int>(form, "pageIndex") == 0 && Get<LightingProfile>(form, "profile").layers[0].settings.effect == "spacedMatrixRain", "gallery adds effect and opens its inline workspace");
+                Call(form, "RemoveLayer"); Call(form, "SelectLayer", originalId);
                 string savedName = saved.layers[0].name;
                 Get<TextBox>(form, "layerName").Text = "Unsaved edit";
                 Get<NumericUpDown>(form, "speed").Value = 2.5m;
@@ -82,11 +119,11 @@ namespace Gmk104LightingStudio
 
                 Call(form, "SetSelection", new List<string>());
                 Set(form, "selecting", true); Call(form, "UpdateSelection"); Call(form, "ClickKey", "KeyA");
-                Check(draft.layers[0].keyIDs.SequenceEqual(new[] { "KeyA" }) && Get<KeyboardView>(form, "keyboard").Selection.SetEquals(new[] { "KeyA" }), "onscreen selection changes draft trigger mask; tab=" + Get<TabControl>(form, "tabs").SelectedIndex + "; selecting=" + Get<bool>(form, "selecting") + "; ids=" + String.Join(",", draft.layers[0].keyIDs));
+                Check(draft.layers[0].keyIDs.SequenceEqual(new[] { "KeyA" }) && Get<KeyboardView>(form, "keyboard").Selection.SetEquals(new[] { "KeyA" }), "onscreen selection changes draft trigger mask; tab=" + Get<int>(form, "pageIndex") + "; selecting=" + Get<bool>(form, "selecting") + "; ids=" + String.Join(",", draft.layers[0].keyIDs));
                 Call(form, "ClickKey", "KeyA"); Check(draft.layers[0].keyIDs.Count == 0, "selecting same key toggles off");
-                var tabs = Get<TabControl>(form, "tabs"); IntPtr tabHandle = tabs.Handle; tabs.SelectedIndex = 2;
+                Call(form, "Navigate", 3);
                 Check(!Get<bool>(form, "selecting") && Get<KeyboardView>(form, "keyboard").ShowIndices && Get<KeyboardView>(form, "keyboard").Selection == null, "mapping tab exits layer selection");
-                tabs.SelectedIndex = 0;
+                Call(form, "Navigate", 0);
                 Check(!Get<KeyboardView>(form, "keyboard").ShowIndices && Get<KeyboardView>(form, "keyboard").SelectionEnabled, "returning from mapping restores automatic selection");
                 Check(Get<RGBClient>(form, "client") == null, "tab switching does not acquire a keyboard");
 
@@ -104,9 +141,9 @@ namespace Gmk104LightingStudio
                 Check(Object.ReferenceEquals(lastPulse, pulses[pulses.Count - 1]) && Get<HashSet<string>>(form, "toggledKeys").Contains("KeyA") == wasToggled, "held-key repeats add no pulse and never repeat a toggle");
                 Set(form, "playing", false);
 
-                Call(form, "AddLayer"); Check(draft.layers.Count == 2 && Get<ListBox>(form, "layersBox").SelectedIndex == 0 && draft.layers[0].settings.effect == "staticColor", "adding selects new top layer");
+                Call(form, "AddLayer"); Check(draft.layers.Count == 2 && Get<int>(form, "selectedLayerIndex") == 0 && draft.layers[0].settings.effect == "staticColor", "adding selects new top layer");
                 Call(form, "DuplicateLayer"); Check(draft.layers.Count == 3 && draft.layers[0].id != draft.layers[1].id && !Object.ReferenceEquals(draft.layers[0].settings, draft.layers[1].settings), "copy layer has independent settings and identity");
-                string moved = draft.layers[0].id; Call(form, "MoveLayer", 1); Check(draft.layers[1].id == moved && Get<ListBox>(form, "layersBox").SelectedIndex == 1, "reordering keeps selected layer");
+                string moved = draft.layers[0].id; Call(form, "MoveLayer", 1); Check(draft.layers[1].id == moved && Get<int>(form, "selectedLayerIndex") == 1, "reordering keeps selected layer");
                 Call(form, "RemoveLayer"); Check(draft.layers.Count == 2, "remove retains valid stack");
 
                 string beforeClear = Json.Serialize(draft);

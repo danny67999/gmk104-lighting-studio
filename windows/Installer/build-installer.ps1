@@ -1,9 +1,10 @@
-param([string]$InnoCompiler,[switch]$SkipTests)
+param([string]$InnoCompiler,[switch]$SkipTests,[string]$Version="1.0.2")
 $ErrorActionPreference='Stop'
+if($Version -notmatch '^\d+\.\d+\.\d+$'){throw 'Version must be major.minor.patch'}
 $windowsRoot=Split-Path -Parent $PSScriptRoot
 $projectRoot=Split-Path -Parent $windowsRoot
 $csc='C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe'
-$artifacts=Join-Path $projectRoot 'outputs\windows-installer-1.0.0'
+$artifacts=Join-Path $projectRoot ('outputs\windows-installer-'+$Version)
 $payload=Join-Path $artifacts 'portable'
 $icons=Join-Path $windowsRoot 'Resources'
 if(Test-Path -LiteralPath $payload){Remove-Item -LiteralPath $payload -Recurse -Force}
@@ -36,7 +37,7 @@ if($test.ExitCode-ne 0){throw "Embedded flasher self-test failed: $selfTestRoot"
 Write-Output 'Packaged firmware EXE self-test PASS (all five public offline target plans)'
 if(-not $InnoCompiler){$InnoCompiler=Join-Path $projectRoot 'work\packaging-tools\inno-6.7.3\ISCC.exe'}
 if(-not(Test-Path -LiteralPath $InnoCompiler)){throw 'Supply -InnoCompiler with the installed Inno Setup 6 ISCC.exe path.'}
-& $InnoCompiler ("/DPayloadDir=$payload") ("/DArtifactDir=$artifacts") (Join-Path $PSScriptRoot 'GMK104.iss')
+& $InnoCompiler ("/DProductVersion=$Version") ("/DPayloadDir=$payload") ("/DArtifactDir=$artifacts") (Join-Path $PSScriptRoot 'GMK104.iss')
 if($LASTEXITCODE-ne 0){throw 'Installer compilation failed'}
 Copy-Item -LiteralPath $flasher -Destination $artifacts -Force
 Write-Output "INSTALLER BUILD PASS: $artifacts"

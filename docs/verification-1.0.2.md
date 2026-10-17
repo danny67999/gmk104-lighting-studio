@@ -1,6 +1,6 @@
-# Windows firmware uploader 1.0.2 verification
+# Complete release 1.0.2 verification
 
-The release is limited to the Windows firmware uploader. Lighting Studio and macOS source and builds remain at the published 1.0 release. No firmware image bytes changed.
+The release includes Lighting Studio and firmware tools together for Windows and macOS. Windows includes the tested three-page workspace UI previously delivered locally as 1.0.1, plus the corrected 1.0.2 uploader. Both platforms display desktop package version 1.0.2. No firmware image bytes changed.
 
 - Launcher: x64 .NET Framework, assembly/file version 1.0.2.0.
 - Launcher SHA-256: `b44d6be59a4e14dd1c7cd00cc486a6d38cca037cdd64b5c9cbad37d9a1fdd866`.

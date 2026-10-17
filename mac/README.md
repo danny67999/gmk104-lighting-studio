@@ -1,6 +1,6 @@
-# GMK104 Lighting Studio 1.0 for macOS
+# GMK104 Lighting Studio 1.0.2 for macOS
 
-Apple Silicon, macOS 13+. Open the 1.0 DMG and drag GMK104 RGB Controller and GMK104 Firmware Installer to Applications. These builds are ad-hoc signed, without Apple notarization; a trusted download may need Privacy & Security → Open Anyway.
+Apple Silicon, macOS 13+. Open the 1.0.2 DMG and drag GMK104 RGB Controller and GMK104 Firmware Installer to Applications. These builds are ad-hoc signed, without Apple notarization; a trusted download may need Privacy & Security → Open Anyway.
 
 Connect the keyboard, use My Lighting to add effects and edit each layer inline. Click/drag on keys to paint a selection or start in a gap to draw a selection rectangle. Shift adds; Option removes. Affect all keys is always visible in the layer editor. Per-layer Speed controls motion and fading. Up to sixteen layers can run on the keyboard.
 

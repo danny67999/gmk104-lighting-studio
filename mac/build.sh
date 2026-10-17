@@ -20,8 +20,8 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 <key>CFBundleExecutable</key><string>GMK104RGBController</string>
 <key>CFBundleIconFile</key><string>AppIcon</string>
 <key>CFBundlePackageType</key><string>APPL</string>
-<key>CFBundleShortVersionString</key><string>1.0</string>
-<key>CFBundleVersion</key><string>36</string>
+<key>CFBundleShortVersionString</key><string>1.0.2</string>
+<key>CFBundleVersion</key><string>37</string>
 <key>LSMinimumSystemVersion</key><string>13.0</string>
 <key>NSAudioCaptureUsageDescription</key><string>React keyboard lighting to audio playing on your Mac. Audio is analyzed locally and is never recorded or uploaded.</string>
 <key>NSBluetoothAlwaysUsageDescription</key><string>Control lighting on your paired GMK104 keyboard over Bluetooth.</string>

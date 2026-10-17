@@ -15,8 +15,8 @@ namespace Gmk104LightingStudio
                 Application.EnableVisualStyles(); Application.SetCompatibleTextRenderingDefault(false);
                 using (var form = new StudioForm(true))
                 {
-                    form.Show(); if (args.Length > 2) form.SelectPreviewTab(Int32.Parse(args[2])); Application.DoEvents();
-                    using (var bitmap = new System.Drawing.Bitmap(form.Width, form.Height)) { form.DrawToBitmap(bitmap, new System.Drawing.Rectangle(0, 0, form.Width, form.Height)); bitmap.Save(args[1], System.Drawing.Imaging.ImageFormat.Png); }
+                    form.Show(); form.Size = new System.Drawing.Size(1320, 880); if (args.Length > 3) form.LoadPreviewPreset(args[3]); if (args.Length > 2) form.SelectPreviewTab(Int32.Parse(args[2])); Application.DoEvents(); form.RenderPreviewFrame(); Application.DoEvents();
+                    form.SavePreviewImage(args[1]);
                     form.Close();
                 }
                 return;

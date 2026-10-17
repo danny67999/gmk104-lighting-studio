@@ -1,6 +1,6 @@
 # Install and connect
 
-Download from the [1.0 release](https://github.com/danny67999/gmk104-lighting-studio/releases/tag/v1.0). Windows: run the Setup EXE, or extract the complete portable ZIP. Mac: open the Apple Silicon DMG and drag both apps to Applications. Quit older copies before opening the new app. Existing computer profiles are stored separately and are not removed by the installer.
+Download from the [complete 1.0.2 release](https://github.com/danny67999/gmk104-lighting-studio/releases/tag/v1.0.2). Windows: run the Setup EXE, or extract the complete portable ZIP. Mac: open the Apple Silicon DMG and drag both apps to Applications. Quit older copies before opening the new app. Existing computer profiles are stored separately and are not removed by the installer.
 
 These community builds have no trusted publisher signing certificate or Apple notarization. Only open downloads you trust. macOS may offer Open Anyway under System Settings → Privacy & Security. Do not disable operating-system security globally.
 
