@@ -1,4 +1,4 @@
-# Firmware Installer 1.0.2 (Complete Lighting firmware 1.0)
+# Windows Firmware Flasher (Complete Lighting firmware 1.0)
 
 The [latest complete release](https://github.com/danny67999/gmk104-lighting-studio/releases/latest) includes Lighting Studio and the firmware installer together for Windows and macOS. The standalone firmware tools are optional.
 
