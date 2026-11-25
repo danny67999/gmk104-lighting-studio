@@ -1,6 +1,6 @@
 # Firmware Installer 1.0.2 (Complete Lighting firmware 1.0)
 
-The [complete 1.0.2 release](https://github.com/danny67999/gmk104-lighting-studio/releases/tag/v1.0.2) includes Lighting Studio and the firmware installer together for Windows and macOS. The standalone firmware tools are optional.
+The [latest complete release](https://github.com/danny67999/gmk104-lighting-studio/releases/latest) includes Lighting Studio and the firmware installer together for Windows and macOS. The standalone firmware tools are optional.
 
 The Mac and Windows installers ship the same five hash-pinned images: complete lighting firmware 1.0, legacy custom v0.2/v0.3/v0.4, and stock recovery. These legacy images were already included in published GitHub releases. The intermediate local test builds are not offered by either installer. See `firmware-catalog.json` at the repository root for exact hashes.
 
@@ -13,3 +13,9 @@ Each flashing exchange may wait up to one minute. A separate overall deadline bo
 Persistent storage is reverse engineered and checked by the firmware before committing. A failed boot can require hardware recovery. Neither application installation nor opening the firmware tool flashes anything automatically. The 1.0 release preparation runs offline tests and does not flash a physical keyboard.
 
 Windows uploader 1.0.2 uses a native transfer loop and the same 16 ms post-ACK settling interval as the Mac installer. Every packet still requires its existing acknowledgement, queue check, and 60-second response allowance. Logs now record elapsed time and the last acknowledged report; queue errors include the Windows error code. Firmware bytes are unchanged. A zero-byte response stops the upload; it does not trigger a reconnect, resend or activation. The observed Windows stock-to-1.0 attempt stopped after 120.3 seconds at report 3495/3633. This is timing evidence, not proof of a specific firmware watchdog or a validated repair on hardware.
+
+## VIA 0x00FF compatibility override
+
+Use the override only if you understand what it does or support instructed you to. It starts unchecked and is available for Complete Lighting 1.0 and stock recovery. This covers the wired GMK104 case where the normal VIA protocol request returns a consistent `0x00FF` while the installed firmware CRC identifies verified stock (`B85531A2`) or Complete Lighting 1.0 (`7F2F4310`).
+
+Run **Inspect USB keyboard** and **Test USB connection** before flashing. The flasher checks both USB interfaces, the reported CRC, a repeated VIA response, and a read-only lighting query or firmware capability signatures. The reboot check also accepts the scoped reply while verifying the target CRC and lighting interface.

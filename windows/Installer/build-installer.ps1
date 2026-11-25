@@ -1,4 +1,4 @@
-param([string]$InnoCompiler,[switch]$SkipTests,[string]$Version="1.0.2")
+param([string]$InnoCompiler,[switch]$SkipTests,[string]$Version="1.0.3")
 $ErrorActionPreference='Stop'
 if($Version -notmatch '^\d+\.\d+\.\d+$'){throw 'Version must be major.minor.patch'}
 $windowsRoot=Split-Path -Parent $PSScriptRoot

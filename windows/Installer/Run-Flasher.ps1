@@ -2,13 +2,14 @@ param(
     [ValidateSet('DryRun','Inspect','TestConnection','Flash')][string]$Mode='DryRun',
     [ValidateSet('Release','Custom','Wireless','Streaming','Stock')][string]$Target='Release',
     [string]$Confirmation,
+    [switch]$AllowVia00FF,
     [switch]$NoPause
 )
 $ErrorActionPreference='Stop'
 $resultCode=0
 try {
     if($NoPause -and $Mode -ne 'DryRun'){throw 'Unattended device operations are not supported by the launcher.'}
-    & (Join-Path $PSScriptRoot 'GMK104-Guarded-Flasher.ps1') -Mode $Mode -Target $Target -Confirmation $Confirmation
+    & (Join-Path $PSScriptRoot 'GMK104-Guarded-Flasher.ps1') -Mode $Mode -Target $Target -Confirmation $Confirmation -AllowVia00FF:$AllowVia00FF
 } catch {
     $resultCode=1
     Write-Host ('Operation stopped: ' + $_.Exception.Message) -ForegroundColor Red

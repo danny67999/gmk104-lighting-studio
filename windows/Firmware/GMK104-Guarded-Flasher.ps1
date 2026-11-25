@@ -2,7 +2,8 @@
 param(
     [ValidateSet('Inspect', 'DryRun', 'TestConnection', 'Flash')][string]$Mode = 'Inspect',
     [ValidateSet('Release','Custom','Wireless','Streaming','Stock')][string]$Target = 'Release',
-    [string]$Confirmation
+    [string]$Confirmation,
+    [switch]$AllowVia00FF
 )
 
 $ErrorActionPreference = 'Stop'
@@ -484,11 +485,47 @@ function Get-VerifiedVersionFromSession {
     return Convert-VersionResponse $a
 }
 
-function Assert-NormalViaResponse {
-    param([object]$Via)
-    [byte[]]$r=[Gmk104WindowsFirmwareHid]::QueryVia($Via,([byte[]](1)),3000)
-    if($r.Length-ne 33){throw 'VIA protocol response length is invalid.'}
-    Assert-Prefix $r ([byte[]](0,1,0,0x0B)) 'VIA protocol response'
+function Read-ViaProtocolVersion {
+    param([byte[]]$Response)
+    if($null -eq $Response -or $Response.Length -ne 33){throw 'VIA protocol response length is invalid.'}
+    Assert-Prefix $Response ([byte[]](0,1,0)) 'VIA protocol response'
+    return [int]$Response[3]
+}
+
+function Test-Via00FFScope {
+    param([uint32]$InstalledCrc,[string]$ImageTarget)
+    return ($InstalledCrc -in @($ExpectedStockCrc,$ExpectedReleaseCrc)) -and
+           ($ImageTarget -in @('Release','Stock'))
+}
+
+function Assert-CompatibleViaProtocol {
+    param(
+        [byte[]]$Response,
+        [uint32]$InstalledCrc,
+        [string]$ImageTarget,
+        [switch]$AllowVia00FF
+    )
+    $protocol = Read-ViaProtocolVersion $Response
+    if($protocol -eq 0x0B){return $protocol}
+    if($protocol -eq 0xFF -and (Test-Via00FFScope $InstalledCrc $ImageTarget)){
+        if($AllowVia00FF){return $protocol}
+        throw 'VIA replied with 0x00FF. For this stock/Complete Lighting 1.0 pair, enable the VIA 0x00FF override and start with Inspect USB keyboard.'
+    }
+    throw ('Unexpected VIA protocol version 0x{0:X4} for installed CRC 0x{1:X8}. Expected 0x000B.' -f $protocol,$InstalledCrc)
+}
+
+function Assert-Via00FFReplyStable {
+    param([byte[]]$First,[byte[]]$Second)
+    if(-not(Test-ByteArrayEqual $First $Second)){
+        throw 'VIA 0x00FF protocol response changed on repeat. The override was rejected.'
+    }
+}
+
+function Assert-StockViaLightingResponse {
+    param([byte[]]$Response)
+    if($null -eq $Response -or $Response.Length -ne 33){throw 'Stock VIA lighting response length is invalid.'}
+    Assert-Prefix $Response ([byte[]](0,8,3,2)) 'Stock VIA lighting response'
+    if($Response[4] -gt 18){throw 'Stock VIA replied with an invalid lighting effect ID.'}
 }
 
 function Assert-CustomViaSignature {
@@ -519,8 +556,23 @@ function Get-Gmk104State {
     $version=Get-VerifiedVersionFromDevice $o
     if($version.Version-ne 0){throw ('Unexpected firmware version field 0x{0:X8}.' -f $version.Version)}
     if($version.Crc-notin@($ExpectedReleaseCrc,$ExpectedMatrixColumnsCrc,$ExpectedMatrixVerticalCrc,$ExpectedMatrixStaggeredCrc,$ExpectedMatrixFixedCrc,$ExpectedStockCrc,$ExpectedCustomCrc,$ExpectedWirelessCrc,$ExpectedStreamingCrc,$RetiredCustomCrc,$ExpectedPersistentCrc,$ExpectedPreviousCrc,$ExpectedPerformanceCrc,$ExpectedReactiveCrc,$ExpectedMatrixCrc)){throw ('Unapproved installed CRC 0x{0:X8}.' -f $version.Crc)}
-    Assert-NormalViaResponse $v
-    return [pscustomobject]@{Device=$o;ViaDevice=$v;Version=$version.Version;Crc=$version.Crc;ContainerId=$o.ContainerId}
+    [byte[]]$reply = [Gmk104WindowsFirmwareHid]::QueryVia($v,([byte[]](1)),3000)
+    $viaProtocol = Assert-CompatibleViaProtocol $reply $version.Crc $Target -AllowVia00FF:$AllowVia00FF
+    if($viaProtocol -eq 0xFF){
+        [byte[]]$repeat = [Gmk104WindowsFirmwareHid]::QueryVia($v,([byte[]](1)),3000)
+        Assert-Via00FFReplyStable $reply $repeat
+        if($version.Crc -eq $ExpectedStockCrc){
+            [byte[]]$lighting = [Gmk104WindowsFirmwareHid]::QueryVia($v,([byte[]](8,3,2)),3000)
+            Assert-StockViaLightingResponse $lighting
+        } else {
+            Assert-CustomViaSignature $v 2
+            Assert-WirelessSleepSignature $v
+        }
+    }
+    return [pscustomobject]@{
+        Device=$o;ViaDevice=$v;Version=$version.Version;Crc=$version.Crc
+        ContainerId=$o.ContainerId;ViaProtocol=$viaProtocol
+    }
 }
 
 function Assert-WirelessSleepSignature {
@@ -596,7 +648,7 @@ function Test-SustainedConnection {
         }
     } finally {$check.Dispose();Write-Progress -Activity 'Testing USB connection (read only)' -Completed}
     $after=Get-Gmk104State
-    if($after.Crc-ne$State.Crc-or$after.ContainerId-ne$State.ContainerId-or$after.Device.Path-cne$State.Device.Path-or$after.ViaDevice.Path-cne$State.ViaDevice.Path){throw 'Keyboard attachment changed during the connection check.'}
+    if($after.Crc-ne$State.Crc-or$after.ContainerId-ne$State.ContainerId-or$after.Device.Path-cne$State.Device.Path-or$after.ViaDevice.Path-cne$State.ViaDevice.Path-or$after.ViaProtocol-ne$State.ViaProtocol){throw 'Keyboard attachment or VIA protocol changed during the connection check.'}
     Write-Output 'READ-ONLY CONNECTION CHECK: 4000 consistent firmware replies passed.'
 }
 
@@ -659,6 +711,10 @@ try {
     Write-Output ('  Product={0}; manufacturer={1}; USB version=0x{2:X4}' -f $state.Device.Product,$state.Device.Manufacturer,$state.Device.Attributes.VersionNumber)
     Write-Output ('  Physical container={0}' -f $state.ContainerId)
     Write-Output ('  Installed version=0x{0:X8}, CRC=0x{1:X8}' -f $state.Version,$state.Crc)
+    Write-Output ('  VIA protocol=0x{0:X4}' -f $state.ViaProtocol)
+    if($state.ViaProtocol -eq 0xFF){
+        Write-Warning 'VIA 0x00FF override active. The exact stock/Complete Lighting 1.0 pair and the lighting interface checks passed.'
+    }
     if($state.Crc-in@($ExpectedReleaseCrc,$ExpectedMatrixColumnsCrc,$ExpectedMatrixVerticalCrc,$ExpectedMatrixStaggeredCrc,$ExpectedMatrixFixedCrc,$ExpectedCustomCrc,$ExpectedWirelessCrc,$ExpectedStreamingCrc,$ExpectedPersistentCrc,$ExpectedPreviousCrc,$ExpectedPerformanceCrc,$ExpectedReactiveCrc,$ExpectedMatrixCrc)){Assert-CustomViaSignature $state.ViaDevice 2;Write-Output '  Compatible custom RGB signature: PASS'}
     elseif($state.Crc-eq$RetiredCustomCrc){Assert-CustomViaSignature $state.ViaDevice 1;Write-Warning 'Retired custom v0.1 is installed; only stock rollback is permitted.'}
     if($state.Crc-in@($ExpectedReleaseCrc,$ExpectedMatrixColumnsCrc,$ExpectedMatrixVerticalCrc,$ExpectedMatrixStaggeredCrc,$ExpectedMatrixFixedCrc,$ExpectedWirelessCrc,$ExpectedStreamingCrc,$ExpectedPersistentCrc,$ExpectedPreviousCrc,$ExpectedPerformanceCrc,$ExpectedReactiveCrc,$ExpectedMatrixCrc)){Assert-WirelessSleepSignature $state.ViaDevice}
@@ -684,7 +740,7 @@ try {
     Test-SustainedConnection $state
     if($Target-eq'Persistent'-and$state.Crc-eq$ExpectedPreviousCrc){Test-PersistentStoragePrecheck $state}
     $armed=Get-Gmk104State
-    if($armed.Crc-ne$sourceCrc-or$armed.ContainerId-ne$state.ContainerId-or$armed.Device.Path-cne$state.Device.Path-or$armed.ViaDevice.Path-cne$state.ViaDevice.Path){
+    if($armed.Crc-ne$sourceCrc-or$armed.ContainerId-ne$state.ContainerId-or$armed.Device.Path-cne$state.Device.Path-or$armed.ViaDevice.Path-cne$state.ViaDevice.Path-or$armed.ViaProtocol-ne$state.ViaProtocol){
         throw 'Keyboard identity or firmware changed after confirmation. OTA START was not sent.'
     }
 
@@ -699,12 +755,13 @@ try {
         try{$logWriter=[IO.StreamWriter]::new($logStream,$encoding)}catch{$logStream.Dispose();throw}
         $logWriter.AutoFlush=$true
         Write-FlashLog $logWriter ('PRECHECK target={0} source=0x{1:X8} target=0x{2:X8}' -f $Target,$exclusive.Crc,$image.Crc)
+        Write-FlashLog $logWriter ('VIA protocol=0x{0:X4} override={1}' -f $state.ViaProtocol,($state.ViaProtocol -eq 0xFF))
         Write-FlashLog $logWriter ('IMAGE sha256={0} padded={1} stream={2}' -f $image.Hash,$plan.PaddedHash,$plan.StreamHash)
         [Gmk104WindowsFirmwareHid]::BeginPowerHold();$powerHeld=$true;$deadline=[Diagnostics.Stopwatch]::StartNew()
         Write-Warning 'FLASH STARTING. Keep the USB cable and computer power connected.'
         Write-Output "  Durable flash log: $logPath"
 
-        Write-FlashLog $logWriter 'TRANSPORT uploader=1.0.2 min-send=16ms post-ack=16ms engine=native reply-timeout=60000ms'
+        Write-FlashLog $logWriter 'TRANSPORT uploader=1.0.3 min-send=16ms post-ack=16ms engine=native reply-timeout=60000ms'
         $transferStarted=$true;$script:FlashLogRequired=$false
         [byte[][]]$preparedReports=$plan.DataReports.ToArray()
         $nativeResult=[Gmk104WindowsFirmwareHid]::Transfer($session,$plan.Start,$preparedReports,$plan.End,$logWriter,$FlashDeadlineMinutes)
@@ -738,7 +795,9 @@ try {
             if($after.Crc-eq$image.Crc){
                 if($Target-ne'Stock'){Assert-CustomViaSignature $after.ViaDevice 2}
                 if($Target-in@('Release','Wireless','Streaming','MatrixColumns','MatrixVertical','MatrixStaggered','MatrixFixed','Matrix','Reactive','Performance','Persistent','Previous')){Assert-WirelessSleepSignature $after.ViaDevice}
-                $verified=$true;Write-FlashLog $logWriter ("POSTBOOT VERIFIED attempt=$attempt");break
+                $verified=$true
+                Write-FlashLog $logWriter ('POSTBOOT VERIFIED attempt={0} via=0x{1:X4}' -f $attempt,$after.ViaProtocol)
+                break
             }
             $lastError=('Saw CRC 0x{0:X8}.' -f $after.Crc)
         } catch{$lastError=$_.Exception.Message;Write-FlashLog $logWriter "POSTBOOT WAIT attempt=$attempt error=$lastError"}

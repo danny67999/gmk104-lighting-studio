@@ -5,7 +5,7 @@
   #error ArtifactDir is required
 #endif
 #ifndef ProductVersion
-#define ProductVersion "1.0.2"
+#define ProductVersion "1.0.3"
 #endif
 [Setup]
 #ifdef SmokeTest

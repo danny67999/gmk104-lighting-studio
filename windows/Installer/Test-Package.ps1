@@ -1,4 +1,4 @@
-param([Parameter(Mandatory=$true)][string]$InnoCompiler,[string]$Version='1.0.2')
+param([Parameter(Mandatory=$true)][string]$InnoCompiler,[string]$Version='1.0.3')
 $ErrorActionPreference='Stop'
 $root=Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $build=Join-Path $root ('outputs\windows-installer-'+$Version)
@@ -21,7 +21,7 @@ $expected=$Version+'.0'
 foreach($name in @('GMK104 Lighting Studio.exe','GMK104 Firmware Flasher.exe')){
     if([Diagnostics.FileVersionInfo]::GetVersionInfo((Join-Path $install $name)).FileVersion-ne$expected){throw "Wrong installed version: $name"}
 }
-$preview=Join-Path $root 'outputs\Windows-1.0.2-Preview.png'
+$preview=Join-Path $root ('outputs\Windows-'+$Version+'-Preview.png')
 $p=Start-Process -FilePath (Join-Path $install 'GMK104 Lighting Studio.exe') -ArgumentList @('--preview',('"'+$preview+'"')) -Wait -PassThru
 if($p.ExitCode-ne 0-or-not(Test-Path -LiteralPath $preview)){throw 'Installed Lighting Studio offline preview failed'}
 $p=Start-Process -FilePath (Join-Path $install 'GMK104 Firmware Flasher.exe') -ArgumentList @('--self-test',('"'+$smoke+'\offline-flasher"')) -Wait -PassThru

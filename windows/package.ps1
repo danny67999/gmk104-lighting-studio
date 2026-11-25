@@ -1,4 +1,4 @@
-param([string]$InnoCompiler,[switch]$SkipTests,[string]$Version="1.0.2")
+param([string]$InnoCompiler,[switch]$SkipTests,[string]$Version="1.0.3")
 $ErrorActionPreference='Stop'
 $project=Split-Path -Parent $PSScriptRoot
 & (Join-Path $PSScriptRoot 'Installer\build-installer.ps1') -InnoCompiler $InnoCompiler -SkipTests:$SkipTests -Version $Version

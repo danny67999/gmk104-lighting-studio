@@ -17,14 +17,14 @@ jobs:
         run: |
           $compiler = 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
           if (-not (Test-Path -LiteralPath $compiler)) { throw 'Hosted runner Inno Setup compiler is missing' }
-          ./windows/package.ps1 -InnoCompiler $compiler -SkipTests -Version 1.0.2
-          ./windows/Installer/Test-Package.ps1 -InnoCompiler $compiler -Version 1.0.2
+          ./windows/package.ps1 -InnoCompiler $compiler -SkipTests -Version 1.0.3
+          ./windows/Installer/Test-Package.ps1 -InnoCompiler $compiler -Version 1.0.3
       - name: Save complete Windows release packages
         uses: actions/upload-artifact@v4
         with:
-          name: windows-release-1.0.2
+          name: windows-release-1.0.3
           if-no-files-found: error
           path: |
-            outputs/release-1.0.2/*
-            outputs/Windows-1.0.2-Preview.png
+            outputs/release-1.0.3/*
+            outputs/Windows-1.0.3-Preview.png
             outputs/Windows-Package-Verification.json

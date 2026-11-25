@@ -42,6 +42,48 @@ $badEnd=New-FlashPlan $image;$badEnd.End[8]=$badEnd.End[8]-bxor 1
 Assert-Reject {Test-FlashPlan $badEnd} 'Invalid end complement accepted'
 Write-Output "FIRMWARE OFFLINE TESTS PASS ($checked assertions; all five published golden image and packet hashes verified)."
 
+$viaChecksBefore = $checked
+[byte[]]$normalVia = New-Object byte[] 33
+$normalVia[1] = 1
+$normalVia[3] = 0x0B
+[byte[]]$reportedVia = $normalVia.Clone()
+$reportedVia[3] = 0xFF
+Assert-Check ((Assert-CompatibleViaProtocol $normalVia $ExpectedStockCrc 'Release') -eq 0x0B) 'Normal stock VIA response was rejected'
+Assert-Check ((Assert-CompatibleViaProtocol $normalVia $ExpectedCustomCrc 'Custom') -eq 0x0B) 'Normal legacy VIA response was rejected'
+Assert-Reject {Assert-CompatibleViaProtocol $reportedVia $ExpectedStockCrc 'Release'} 'VIA 0x00FF was accepted by default'
+Assert-Reject {Assert-CompatibleViaProtocol $reportedVia $ExpectedReleaseCrc 'Stock'} 'VIA 0x00FF recovery was accepted by default'
+foreach($pair in @(
+    @{Crc=$ExpectedStockCrc;Target='Release'},
+    @{Crc=$ExpectedReleaseCrc;Target='Release'},
+    @{Crc=$ExpectedReleaseCrc;Target='Stock'},
+    @{Crc=$ExpectedStockCrc;Target='Stock'}
+)){
+    Assert-Check ((Assert-CompatibleViaProtocol $reportedVia $pair.Crc $pair.Target -AllowVia00FF) -eq 0xFF) 'Scoped VIA 0x00FF preflight or postboot check was rejected'
+}
+Assert-Reject {Assert-CompatibleViaProtocol $reportedVia ([uint32]0x12345678) 'Release' -AllowVia00FF} 'Unknown CRC accepted the VIA override'
+Assert-Reject {Assert-CompatibleViaProtocol $reportedVia $ExpectedCustomCrc 'Release' -AllowVia00FF} 'Legacy CRC accepted the VIA override'
+foreach($legacy in @('Custom','Wireless','Streaming')){
+    Assert-Reject {Assert-CompatibleViaProtocol $reportedVia $ExpectedStockCrc $legacy -AllowVia00FF} 'Legacy target accepted the VIA override'
+}
+Assert-Reject {Assert-CompatibleViaProtocol ([byte[]](0,1,0,255)) $ExpectedStockCrc 'Release' -AllowVia00FF} 'Short VIA reply accepted the override'
+foreach($byteIndex in 0..3){
+    [byte[]]$wrongVia = $reportedVia.Clone()
+    $wrongVia[$byteIndex] = $wrongVia[$byteIndex] -bxor 1
+    Assert-Reject {Assert-CompatibleViaProtocol $wrongVia $ExpectedStockCrc 'Release' -AllowVia00FF} 'A different VIA reply accepted the override'
+}
+Assert-Via00FFReplyStable $reportedVia ([byte[]]$reportedVia.Clone())
+[byte[]]$unstableVia = $reportedVia.Clone()
+$unstableVia[32] = 1
+Assert-Reject {Assert-Via00FFReplyStable $reportedVia $unstableVia} 'Inconsistent VIA replies accepted the override'
+[byte[]]$stockLighting = New-Object byte[] 33
+[Array]::Copy(([byte[]](0,8,3,2,1)), $stockLighting, 5)
+Assert-StockViaLightingResponse $stockLighting
+$stockLighting[4] = 255
+Assert-Reject {Assert-StockViaLightingResponse $stockLighting} 'Invalid stock lighting mode accepted the override'
+$stockLighting[4] = 1
+$stockLighting[3] = 1
+Assert-Reject {Assert-StockViaLightingResponse $stockLighting} 'Wrong stock lighting command accepted the override'
+Write-Output "VIA OVERRIDE TESTS PASS ($($checked - $viaChecksBefore) assertions)."
 
 [byte[]]$blank=New-Object byte[] 4096
 for($i=0;$i-lt 4096;$i++){$blank[$i]=255}
